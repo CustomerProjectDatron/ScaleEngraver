@@ -14,8 +14,8 @@ added later without touching the engraving code.
 | `Library/ScaleEngraver/images/` | parameter icons used in the `@doc` texts (`README.md` there lists them) |
 | `Samples/ScaleEngraver/` | the dialog app and the commented samples |
 | `Tests/ScaleEngraver/ScaleEngraverTest.simpl` | checks of the planning layer (no machine motion) |
-| `Installer/store/` | store listing: `description.md`, `cover.png` / `cover.svg` (placeholder cover) |
-| `docs/` | README graphics, `gen_graphics.py` and `render.ps1` to regenerate them |
+| `Installer/store/` | store listing: `description.md`, `logo.png` (= `Store.Image`, the tile logo), `cover.png` / `cover.svg` (wide banner with the logo, not referenced by `metadata.json`) |
+| `docs/` | README graphics, `docs/tiles/` (tile-style icons and the app logo, `gen_tiles.py`), `gen_graphics.py` and `render.ps1` to regenerate them |
 | `.agents/`, `.claude/`, `AGENTS.md`, `CLAUDE.md` | simPL skill, deployed by `simpl-skill install` |
 
 ## Architecture

@@ -1,3 +1,5 @@
+![Scale Engraver](docs/tiles/tile_logo_128.png)
+
 # Scale Engraver
 
 Engrave **rulers, dials, gauges and protractors** on your part. You describe the scale - what it

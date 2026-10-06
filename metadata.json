@@ -8,7 +8,7 @@
                   "Title":  "Scale Engraver",
                   "ShortDescription":  "Engraves rulers, dials, gauges and protractors: major, medium and minor ticks with numbers, set by a few parameters, as straight or circular scales.",
                   "LongDescriptionFile":  "Installer/store/description.md",
-                  "Image":  "Installer/store/cover.png"
+                  "Image":  "Installer/store/logo.png"
               },
     "FileMappings":  [
                          {
