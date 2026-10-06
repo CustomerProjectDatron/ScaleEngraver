@@ -2,7 +2,6 @@
 
 @ Author = "Benjamin Boeck" @
 @ MeasuringSystem = "Metric" @
-
 @ WorkpieceGeometry :"MinEdge":{"X":0.0,"Y":0.0,"Z":-10.0},"MaxEdge":{"X":120.0,"Y":100.0,"Z":0.0}@
 
 # Engraves a 100 mm ruler and a 360 degree dial with fixed values. Work coordinate system:
@@ -38,8 +37,8 @@ export program Main
         minorTick=minorTick
         mediumTick=mediumTick
         labelFormat=rulerLabels
-#        baselineDepth=0.1
-        rotationAngle=45
+        #        baselineDepth=0.1
+
     )
     EngraveLinearScale scale=ruler heights=heights
 
