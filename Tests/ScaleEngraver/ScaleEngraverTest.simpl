@@ -80,15 +80,15 @@ export program Main
     # Fractions for inch scales: eighths, reduced, mixed numbers
     fractionLabels = NewLabelSettings(labelHeight=3 fractionDenominator=8)
     fractionDivision = NewScaleDivision(valueStart=0 valueEnd=2 majorStep=0.125 minorDivisions=1)
-    fractionScale = NewLinearScale(originX=0 originY=0 scaleLength=200 division=fractionDivision majorTick=majorTick minorTick=minorTick labelFormat=fractionLabels)
-    fractionPlan = PlanLinearScale(scale=fractionScale)
-    Expect condition=(fractionPlan.labels[0].text == "0") message="fraction: 0"
-    Expect condition=(fractionPlan.labels[1].text == "1/8") message="fraction: 1/8"
-    Expect condition=(fractionPlan.labels[2].text == "1/4") message="fraction: 2/8 is reduced to 1/4"
-    Expect condition=(fractionPlan.labels[3].text == "3/8") message="fraction: 3/8"
-    Expect condition=(fractionPlan.labels[4].text == "1/2") message="fraction: 4/8 is reduced to 1/2"
-    Expect condition=(fractionPlan.labels[8].text == "1") message="fraction: whole number has no fraction part"
-    Expect condition=(fractionPlan.labels[12].text == "1 1/2") message="fraction: mixed number"
+    eighthsScale = NewLinearScale(originX=0 originY=0 scaleLength=200 division=fractionDivision majorTick=majorTick minorTick=minorTick labelFormat=fractionLabels)
+    eighthsPlan = PlanLinearScale(scale=eighthsScale)
+    Expect condition=(eighthsPlan.labels[0].text == "0") message="fraction: 0"
+    Expect condition=(eighthsPlan.labels[1].text == "1/8") message="fraction: 1/8"
+    Expect condition=(eighthsPlan.labels[2].text == "1/4") message="fraction: 2/8 is reduced to 1/4"
+    Expect condition=(eighthsPlan.labels[3].text == "3/8") message="fraction: 3/8"
+    Expect condition=(eighthsPlan.labels[4].text == "1/2") message="fraction: 4/8 is reduced to 1/2"
+    Expect condition=(eighthsPlan.labels[8].text == "1") message="fraction: whole number has no fraction part"
+    Expect condition=(eighthsPlan.labels[12].text == "1 1/2") message="fraction: mixed number"
 
     # Fraction scale (inch ruler): 0..2 inch, halved 3 times (eighths), fractions labelled down to the quarters
     unitLabels = NewLabelSettings(labelHeight=3 skipFirstLabel=true)
