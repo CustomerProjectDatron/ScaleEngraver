@@ -1,0 +1,67 @@
+﻿module ScaleEngraverSample
+
+@ Author = "Benjamin Boeck" @
+@ MeasuringSystem = "Metric" @
+
+@ WorkpieceGeometry :"MinEdge":{"X":0.0,"Y":0.0,"Z":-10.0},"MaxEdge":{"X":120.0,"Y":100.0,"Z":0.0}@
+
+# Engraves a 100 mm ruler and a 360 degree dial with fixed values. Work coordinate system:
+# X/Y on the part, Z = 0 on the surface. The tool in the spindle is used.
+#
+# The library only generates the engraving motion. Spindle speed, feed and spindle on/off are set
+# here, in the calling program (plunges and cuts both use the current Feed). Depths are positive
+# values: how deep below the surface.
+
+using Base
+using ScaleEngraver
+
+export program Main
+    Absolute
+    Rpm = 13000
+    Feed = 1000
+    Spindle On
+
+    heights = NewEngraveHeights(retractZ=2 approachZ=0.5 safeZ=20)
+    majorTick = NewTickStyle(tickLength=6 tickDepth=0.2)
+    minorTick = NewTickStyle(tickLength=3 tickDepth=0.1)
+    mediumTick = NewTickStyle(tickLength=4.5 tickDepth=0.15)
+
+    # Ruler 0..100 mm along +X, ticks upwards, the "0" on the part edge is not labelled
+    rulerDivision = NewScaleDivision(valueStart=0 valueEnd=100 majorStep=10 minorDivisions=10 mediumEvery=5)
+    rulerLabels = NewLabelSettings(labelHeight=3 labelDepth=0.1)
+    ruler = NewLinearScale(
+        originX=10
+        originY=10
+        scaleLength=100
+        division=rulerDivision
+        majorTick=majorTick
+        minorTick=minorTick
+        mediumTick=mediumTick
+        labelFormat=rulerLabels
+#        baselineDepth=0.1
+        rotationAngle=45
+    )
+    EngraveLinearScale scale=ruler heights=heights
+
+    # Dial 0..360 degrees, clockwise from 12 o'clock, labels follow the circle
+    dialDivision = NewScaleDivision(valueStart=0 valueEnd=120 majorStep=30 minorDivisions=6)
+    dialLabels = NewLabelSettings(labelHeight=3 labelDepth=0.1)
+    dial = NewCircularScale(
+        centerX=50 + 10
+        centerY=30
+        radius=30
+        division=dialDivision
+        majorTick=majorTick
+        minorTick=minorTick
+        labelFormat=dialLabels
+        startAngle=30
+        endAngle=150
+        baselineDepth=0.1
+    )
+    EngraveCircularScale scale=dial heights=heights
+
+    Spindle Off
+    MoveToParkPosition
+endprogram
+
+end

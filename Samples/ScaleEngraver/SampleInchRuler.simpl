@@ -1,0 +1,79 @@
+﻿module SampleInchRuler
+
+@ Author = "Benjamin Boeck" @
+
+@ WorkpieceGeometry :"MinEdge":{"X":0.0,"Y":0.0,"Z":-10.0},"MaxEdge":{"X":175.0,"Y":30.0,"Z":0.0}@
+
+# SAMPLE: a real inch ruler - whole inches, halves, quarters, eighths and sixteenths.
+#
+# How an inch ruler is built
+#   An inch ruler is not "major / medium / minor". The inch is halved again and again, and every level
+#   has its own tick length:
+#       level 0  whole inch   longest tick, big number      1  2  3 ...
+#       level 1  1/2 inch     shorter tick, small number    1/2
+#       level 2  1/4 inch     shorter again, small number   1/4  3/4
+#       level 3  1/8 inch     shorter again, no number
+#       level 4  1/16 inch    shortest tick, no number
+#   NewFractionScale builds exactly this. levels=4 stops at sixteenths, levels=5 would add 1/32.
+#   The tick lengths and depths of the levels are derived from the longest tick (tickLength,
+#   tickDepth) - or give your own list with the tickStyles parameter.
+#
+# Two text sizes
+#   The whole-inch numbers (unitLabel) and the fractions (fractionLabel) are separate texts. By default
+#   the fractions are 60 percent as big as the numbers; a fraction is written without the whole number
+#   (3/4, not 1 3/4) because the big number before it already says the inch.
+#   fractionLabelLevel=2 labels the halves and quarters; 1 would label only the halves, 0 no fractions.
+#
+# Inch without conversion
+#   AxisSystem::ImperialMeasuring switches the whole control to inch: from then on every position,
+#   length and feed in the program is in inch (feed in inch/min) and the library needs no
+#   conversion - 6 simply means 6 inch. AxisSystem::MetricMeasuring at the end switches back.
+#   (The WorkpieceGeometry above is given in millimetres.)
+#
+# Calling program duties (the library never does these)
+#   Select the tool, set Rpm and Feed, switch the spindle on and off. Use a graver / engraving
+#   tool; adapt Rpm and Feed to your tool and material. Z = 0 is the surface of the part.
+
+using Base
+using ScaleEngraver
+import AxisSystem
+
+export program Main
+    # --- machine setup: the caller's job -------------------------------------------------------
+    AxisSystem::ImperialMeasuring
+    Absolute
+    Rpm = 13000
+    Feed = 30
+    Spindle On
+
+    # --- heights in inch -------------------------------------------------------------------------
+    # retractZ 0.08 = about 2 mm, approachZ 0.02 = about 0.5 mm above the surface, safeZ 0.8 inch
+    heights = NewEngraveHeights(retractZ=0.08 approachZ=0.02 safeZ=0.8)
+
+    # --- the numbers of the whole inches: 0.12 inch high; the 0 on the part edge is not written ----
+    unitNumbers = NewLabelSettings(labelHeight=0.12 labelDepth=0.004 skipFirstLabel=true)
+
+    # --- the ruler: starts at X=0.4 / Y=0.4 inch, 6 inch long, ticks point up (+Y), baseline engraved
+    #     tickLength = longest tick (whole inch), shorter on every finer level; depth 0.008 inch
+    inchRuler = NewFractionScale(
+        originX=0.4
+        originY=0.4
+        scaleLength=6
+        valueStart=0
+        valueEnd=6
+        unitLabel=unitNumbers
+        levels=4
+        tickLength=0.32
+        tickDepth=0.008
+        fractionLabelLevel=2
+        baselineDepth=0.004
+    )
+
+    EngraveFractionScale scale=inchRuler heights=heights
+
+    Spindle Off
+    AxisSystem::MetricMeasuring
+    MoveToParkPosition
+endprogram
+
+end

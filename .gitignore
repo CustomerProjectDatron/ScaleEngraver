@@ -1,0 +1,11 @@
+# Deployed by 'simpl-skill install' - recreate with: simpl-skill install
+.agents/
+.claude/
+.simpl-link
+
+# Written by the control next to every simulated program
+*.MetaData/
+
+# generated
+__pycache__/
+*.pyc

@@ -1,0 +1,29 @@
+{
+    "Name":  "ScaleEngraver",
+    "Author":  "Benjamin Boeck",
+    "Version":  "1.0.0",
+    "Description":  "Engrave linear and circular scales (rulers, dials, gauges, protractors) with major, medium and minor ticks and value labels.",
+    "VersionFilePath":  "Library/ScaleEngraver/VERSION.md",
+    "Store":  {
+                  "Title":  "Scale Engraver",
+                  "ShortDescription":  "Engraves rulers, dials, gauges and protractors: major, medium and minor ticks with numbers, set by a few parameters, as straight or circular scales.",
+                  "LongDescriptionFile":  "Installer/store/description.md",
+                  "Image":  "Installer/store/cover.png"
+              },
+    "FileMappings":  [
+                         {
+                             "Source":  "Library/ScaleEngraver/",
+                             "Destination":  "internal:/ScaleEngraver/"
+                         },
+                         {
+                             "Source":  "Samples/ScaleEngraver/",
+                             "Destination":  "machine:/Samples/ScaleEngraver/"
+                         }
+                     ],
+    "AdditionalTestLinks":  [
+                                {
+                                    "Source":  "Tests/ScaleEngraver/",
+                                    "Destination":  "machine:/Tests/ScaleEngraver/"
+                                }
+                            ]
+}

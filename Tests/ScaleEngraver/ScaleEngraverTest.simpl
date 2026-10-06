@@ -1,0 +1,129 @@
+﻿module ScaleEngraverTest
+
+@ Author = "Benjamin Boeck" @
+@ MeasuringSystem = "Metric" @
+
+# Tests of the planning layer of ScaleEngraver. No machine motion is executed: the plans are
+# computed and checked as data. A failed check raises InvalidArgumentValue with a message.
+
+using Base
+using ScaleEngraver
+import System
+import Math
+
+program Expect (condition:boolean message:string)
+    if not condition
+        System::RaiseError InvalidArgumentValue englishErrorDetails=message
+    endif
+endprogram
+
+program IsClose (actual:number expected:number) returns boolean
+    return Math::Abs(actual - expected) < 0.0001
+endprogram
+
+export program Main
+    majorTick = NewTickStyle(tickLength=6 tickDepth=0.2)
+    minorTick = NewTickStyle(tickLength=3 tickDepth=0.1)
+
+    # Linear 0..100, 10 minor intervals per major interval -> 101 ticks, plus the baseline
+    division = NewScaleDivision(valueStart=0 valueEnd=100 majorStep=10 minorDivisions=10)
+    labels = NewLabelSettings(labelHeight=3)
+    linear = NewLinearScale(originX=10 originY=20 scaleLength=100 division=division majorTick=majorTick minorTick=minorTick labelFormat=labels baselineDepth=0.1)
+    plan = PlanLinearScale(scale=linear)
+    Expect condition=(sizeof plan.lines == 102) message="linear: expected 101 ticks and the baseline"
+    Expect condition=(sizeof plan.labels == 11) message="linear: expected 11 labels"
+    Expect condition=(plan.labels[0].text == "0") message="linear: first label text"
+    Expect condition=IsClose(actual=plan.labels[10].x expected=110) message="linear: last label x"
+    Expect condition=IsClose(actual=plan.labels[0].y expected=28.4) message="linear: label sits above the major tick"
+
+    # Skipping labels on the borders
+    skipLabels = NewLabelSettings(labelHeight=3 skipFirstLabel=true skipLastLabel=true)
+    skipScale = NewLinearScale(originX=10 originY=20 scaleLength=100 division=division majorTick=majorTick minorTick=minorTick labelFormat=skipLabels)
+    skipPlan = PlanLinearScale(scale=skipScale)
+    Expect condition=(sizeof skipPlan.labels == 9) message="linear: first and last label skipped"
+    Expect condition=(skipPlan.labels[0].text == "10") message="linear: first remaining label"
+
+    # Label every second major tick
+    everyLabels = NewLabelSettings(labelHeight=3 labelEvery=2)
+    everyScale = NewLinearScale(originX=0 originY=0 scaleLength=100 division=division majorTick=majorTick minorTick=minorTick labelFormat=everyLabels)
+    everyPlan = PlanLinearScale(scale=everyScale)
+    Expect condition=(sizeof everyPlan.labels == 6) message="linear: label every second major tick"
+
+    # Ticks and labels below the line
+    downScale = NewLinearScale(originX=0 originY=0 scaleLength=100 division=division majorTick=majorTick minorTick=minorTick labelFormat=labels side=TickSide.Negative)
+    downPlan = PlanLinearScale(scale=downScale)
+    Expect condition=(downPlan.lines[0].y2 < 0) message="linear: ticks point down"
+    Expect condition=(downPlan.labels[0].y < -6) message="linear: labels below the ticks"
+
+
+    # Skipping the first and last tick removes the tick and its label
+    skipTickDivision = NewScaleDivision(valueStart=0 valueEnd=100 majorStep=10 minorDivisions=10 skipFirstTick=true skipLastTick=true)
+    skipTickScale = NewLinearScale(originX=0 originY=0 scaleLength=100 division=skipTickDivision majorTick=majorTick minorTick=minorTick labelFormat=labels)
+    skipTickPlan = PlanLinearScale(scale=skipTickScale)
+    Expect condition=(sizeof skipTickPlan.lines == 99) message="linear: first and last tick skipped"
+    Expect condition=(sizeof skipTickPlan.labels == 9) message="linear: labels of skipped ticks removed"
+    Expect condition=IsClose(actual=skipTickPlan.lines[0].x1 expected=1) message="linear: first remaining tick is at 1"
+
+    # Medium ticks: every 5th minor interval, major ticks win where both coincide
+    mediumTick = NewTickStyle(tickLength=4.5 tickDepth=0.15)
+    mediumDivision = NewScaleDivision(valueStart=0 valueEnd=100 majorStep=10 minorDivisions=10 mediumEvery=5)
+    mediumScale = NewLinearScale(originX=0 originY=0 scaleLength=100 division=mediumDivision majorTick=majorTick minorTick=minorTick mediumTick=mediumTick labelFormat=labels)
+    mediumPlan = PlanLinearScale(scale=mediumScale)
+    Expect condition=(sizeof mediumPlan.lines == 101) message="linear: medium ticks do not add ticks"
+    Expect condition=IsClose(actual=mediumPlan.lines[5].y2 expected=4.5) message="linear: tick at 5 has the medium length"
+    Expect condition=IsClose(actual=mediumPlan.lines[10].y2 expected=6) message="linear: tick at 10 stays major"
+    Expect condition=IsClose(actual=mediumPlan.lines[3].y2 expected=3) message="linear: tick at 3 stays minor"
+    defaultMediumScale = NewLinearScale(originX=0 originY=0 scaleLength=100 division=mediumDivision majorTick=majorTick minorTick=minorTick labelFormat=labels)
+    defaultMediumPlan = PlanLinearScale(scale=defaultMediumScale)
+    Expect condition=IsClose(actual=defaultMediumPlan.lines[5].y2 expected=4.5) message="linear: default medium tick is halfway between major and minor"
+
+    # Fractions for inch scales: eighths, reduced, mixed numbers
+    fractionLabels = NewLabelSettings(labelHeight=3 fractionDenominator=8)
+    fractionDivision = NewScaleDivision(valueStart=0 valueEnd=2 majorStep=0.125 minorDivisions=1)
+    fractionScale = NewLinearScale(originX=0 originY=0 scaleLength=200 division=fractionDivision majorTick=majorTick minorTick=minorTick labelFormat=fractionLabels)
+    fractionPlan = PlanLinearScale(scale=fractionScale)
+    Expect condition=(fractionPlan.labels[0].text == "0") message="fraction: 0"
+    Expect condition=(fractionPlan.labels[1].text == "1/8") message="fraction: 1/8"
+    Expect condition=(fractionPlan.labels[2].text == "1/4") message="fraction: 2/8 is reduced to 1/4"
+    Expect condition=(fractionPlan.labels[3].text == "3/8") message="fraction: 3/8"
+    Expect condition=(fractionPlan.labels[4].text == "1/2") message="fraction: 4/8 is reduced to 1/2"
+    Expect condition=(fractionPlan.labels[8].text == "1") message="fraction: whole number has no fraction part"
+    Expect condition=(fractionPlan.labels[12].text == "1 1/2") message="fraction: mixed number"
+
+    # Fraction scale (inch ruler): 0..2 inch, halved 3 times (eighths), fractions labelled down to the quarters
+    unitLabels = NewLabelSettings(labelHeight=3 skipFirstLabel=true)
+    fraction = NewFractionScale(originX=0 originY=0 scaleLength=200 valueStart=0 valueEnd=2 unitLabel=unitLabels levels=3 tickLength=8 tickDepth=0.2 fractionLabelLevel=2)
+    fractionRuler = PlanFractionScale(scale=fraction)
+    Expect condition=(sizeof fractionRuler.lines == 17) message="fraction scale: 2 inch in eighths = 17 ticks"
+    Expect condition=IsClose(actual=fractionRuler.lines[8].y2 expected=8) message="fraction scale: whole inch has the longest tick"
+    Expect condition=IsClose(actual=fractionRuler.lines[4].y2 expected=6.1333) message="fraction scale: half inch tick"
+    Expect condition=IsClose(actual=fractionRuler.lines[2].y2 expected=4.2667) message="fraction scale: quarter inch tick"
+    Expect condition=IsClose(actual=fractionRuler.lines[1].y2 expected=2.4) message="fraction scale: eighth inch tick is the shortest"
+    Expect condition=(sizeof fractionRuler.labels == 8) message="fraction scale: numbers 1 2, halves 2x, quarters 4x"
+    Expect condition=(fractionRuler.labels[0].text == "1/4") message="fraction scale: first label is 1/4 (the 0 is skipped, eighths have no label)"
+    Expect condition=(fractionRuler.labels[1].text == "1/2") message="fraction scale: 1/2"
+    Expect condition=(fractionRuler.labels[2].text == "3/4") message="fraction scale: 3/4 without the whole number"
+    Expect condition=(fractionRuler.labels[3].text == "1") message="fraction scale: whole inch is a number"
+    Expect condition=IsClose(actual=fractionRuler.labels[3].textHeight expected=3) message="fraction scale: unit number size"
+    Expect condition=IsClose(actual=fractionRuler.labels[0].textHeight expected=1.8) message="fraction scale: fractions are 60 percent as big"
+    Expect condition=(fractionRuler.labels[7].text == "2") message="fraction scale: last number"
+
+    # Full circle: the closing tick at 360 is not engraved a second time
+    dialDivision = NewScaleDivision(valueStart=0 valueEnd=360 majorStep=30 minorDivisions=6)
+    dial = NewCircularScale(centerX=0 centerY=0 radius=40 division=dialDivision majorTick=majorTick minorTick=minorTick labelFormat=labels baselineDepth=0.1)
+    dialPlan = PlanCircularScale(scale=dial)
+    Expect condition=(sizeof dialPlan.lines == 72) message="circular: 72 ticks for a full circle"
+    Expect condition=(sizeof dialPlan.labels == 12) message="circular: 12 labels for a full circle"
+    Expect condition=(sizeof dialPlan.arcs == 1) message="circular: baseline arc"
+    Expect condition=IsClose(actual=dialPlan.lines[0].x1 expected=0) message="circular: 0 is at 12 o'clock (x)"
+    Expect condition=IsClose(actual=dialPlan.lines[0].y1 expected=40) message="circular: 0 is at 12 o'clock (y)"
+    Expect condition=IsClose(actual=dialPlan.labels[6].rotation expected=-180) message="circular: tangential label rotation at 6 o'clock"
+
+    # Partial arc keeps both end ticks
+    partialDivision = NewScaleDivision(valueStart=0 valueEnd=270 majorStep=45 minorDivisions=5)
+    partial = NewCircularScale(centerX=0 centerY=0 radius=40 division=partialDivision majorTick=majorTick minorTick=minorTick labelFormat=labels startAngle=225 endAngle=-45)
+    partialPlan = PlanCircularScale(scale=partial)
+    Expect condition=(sizeof partialPlan.lines == 31) message="circular: partial arc keeps both end ticks"
+endprogram
+
+end

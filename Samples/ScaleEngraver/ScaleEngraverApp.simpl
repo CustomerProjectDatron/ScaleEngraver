@@ -1,0 +1,163 @@
+﻿module ScaleEngraverApp
+
+@ Author = "Benjamin Boeck" @
+@ MeasuringSystem = "Metric" @
+@ WorkpieceGeometry :"MinEdge":{"X":0.0,"Y":0.0,"Z":-10.0},"MaxEdge":{"X":120.0,"Y":100.0,"Z":0.0}@
+
+# Operator interface of the ScaleEngraver library: asks for the scale parameters in a few
+# dialogs and engraves the scale. All geometry and motion logic lives in the library module
+# ScaleEngraver - this module only collects input, so another front end (for example a web
+# API) can replace it without touching the engraving code.
+
+using Base
+using DialogUtilities
+using ScaleEngraver
+
+# Asks for tool, speed and feed and applies them here - the library does not touch them.
+# Returns the heights the library needs for its own movements.
+program AskMachining returns EngraveHeights
+    inputs:InputParameter[] = {
+        StringParameter description="Tool name (empty = tool in spindle)" default="",
+        NumberParameter description="Spindle speed" default=13000 unit="rpm",
+        NumberParameter description="Feed" default=1000 unit="mm/min",
+        NumberParameter description="Retract height between engravings" default=2 unit="mm",
+        NumberParameter description="Approach height above the surface (feed starts here)" default=0.5 unit="mm",
+        NumberParameter description="Safe height at the end" default=20 unit="mm"
+    }
+    InputDialog parameters <- inputs caption="Scale engraver - machining"
+    Absolute
+    if inputs[0].StringValue <> ""
+        Tool name=inputs[0].StringValue newRpm=inputs[1].NumberValue skipRestoring
+    endif
+    Rpm = inputs[1].NumberValue
+    Feed = inputs[2].NumberValue
+    Spindle On
+    return NewEngraveHeights(retractZ=inputs[3].NumberValue approachZ=inputs[4].NumberValue safeZ=inputs[5].NumberValue)
+endprogram
+
+program AskDivision returns ScaleDivision
+    inputs:InputParameter[] = {
+        NumberParameter description="First scale value" default=0,
+        NumberParameter description="Last scale value" default=100,
+        NumberParameter description="Major tick every (value)" default=10,
+        NumberParameter description="Minor intervals per major interval" default=10,
+        NumberParameter description="Medium tick every n minor intervals (0 = none)" default=0,
+        BooleanParameter description="Skip the first tick (and its label)" default=false,
+        BooleanParameter description="Skip the last tick (and its label)" default=false
+    }
+    InputDialog parameters <- inputs caption="Scale engraver - values"
+    return NewScaleDivision(valueStart=inputs[0].NumberValue valueEnd=inputs[1].NumberValue majorStep=inputs[2].NumberValue minorDivisions=inputs[3].NumberValue mediumEvery=inputs[4].NumberValue skipFirstTick=inputs[5].BooleanValue skipLastTick=inputs[6].BooleanValue)
+endprogram
+
+program AskMajorTick returns TickStyle
+    inputs:InputParameter[] = {
+        NumberParameter description="Major tick length" default=6 unit="mm",
+        NumberParameter description="Major tick depth (positive = depth)" default=0.2 unit="mm"
+    }
+    InputDialog parameters <- inputs caption="Scale engraver - major ticks"
+    return NewTickStyle(tickLength=inputs[0].NumberValue tickDepth=inputs[1].NumberValue)
+endprogram
+
+program AskMinorTick returns TickStyle
+    inputs:InputParameter[] = {
+        NumberParameter description="Minor tick length" default=3 unit="mm",
+        NumberParameter description="Minor tick depth (positive = depth)" default=0.1 unit="mm"
+    }
+    InputDialog parameters <- inputs caption="Scale engraver - minor ticks"
+    return NewTickStyle(tickLength=inputs[0].NumberValue tickDepth=inputs[1].NumberValue)
+endprogram
+
+program AskMediumTick returns TickStyle
+    inputs:InputParameter[] = {
+        NumberParameter description="Medium tick length (used when medium ticks are on)" default=4.5 unit="mm",
+        NumberParameter description="Medium tick depth (positive = depth)" default=0.15 unit="mm"
+    }
+    InputDialog parameters <- inputs caption="Scale engraver - medium ticks"
+    return NewTickStyle(tickLength=inputs[0].NumberValue tickDepth=inputs[1].NumberValue)
+endprogram
+
+program AskLabels returns LabelSettings
+    inputs:InputParameter[] = {
+        NumberParameter description="Font size (character height)" default=3 unit="mm",
+        NumberParameter description="Engraving depth of the text (positive = depth)" default=0.1 unit="mm",
+        NumberParameter description="Gap between tick end and text" default=1 unit="mm",
+        NumberParameter description="Decimal places" default=0,
+        NumberParameter description="Label every n-th major tick" default=1,
+        BooleanParameter description="Skip the first label" default=false,
+        BooleanParameter description="Skip the last label" default=false,
+        NumberParameter description="Write numbers as fractions with this denominator (0 = decimals, 8 = eighths)" default=0
+    }
+    InputDialog parameters <- inputs caption="Scale engraver - labels"
+    height = inputs[0].NumberValue
+    return NewLabelSettings(labelHeight=height labelDepth=inputs[1].NumberValue labelOffset=inputs[2].NumberValue decimals=inputs[3].NumberValue labelEvery=inputs[4].NumberValue skipFirstLabel=inputs[5].BooleanValue skipLastLabel=inputs[6].BooleanValue fractionDenominator=inputs[7].NumberValue)
+endprogram
+
+program SideFromSelection (index:number) returns TickSide
+    if index == 1
+        return TickSide.Negative
+    endif
+    return TickSide.Positive
+endprogram
+
+export program Main
+    scaleTypes:any[] = { "Linear scale", "Circular scale" }
+    typeSelection:InputSelection = { scaleTypes, 0 }
+    typeInputs:InputParameter[] = {
+        SelectionParameter description="Scale type" selection=typeSelection
+    }
+    InputDialog parameters <- typeInputs caption="Scale engraver"
+    isCircular = typeInputs[0].SelectionValue.Selected == 1
+
+    heights = AskMachining
+    division = AskDivision
+    majorTick = AskMajorTick
+    minorTick = AskMinorTick
+    mediumTick = AskMediumTick
+    labelFormat = AskLabels
+
+    sides:any[] = { "Positive (up / outside)", "Negative (down / inside)" }
+    sideSelection:InputSelection = { sides, 0 }
+
+    if isCircular
+        orientations:any[] = { "Tangential", "Radial", "Horizontal" }
+        orientationSelection:InputSelection = { orientations, 0 }
+        circularInputs:InputParameter[] = {
+            NumberParameter description="Center X" default=0 unit="mm",
+            NumberParameter description="Center Y" default=0 unit="mm",
+            NumberParameter description="Radius of the scale circle" default=40 unit="mm",
+            NumberParameter description="Start angle (0 = +X, counter-clockwise)" default=90 unit="deg",
+            NumberParameter description="End angle (smaller than start = clockwise)" default=-270 unit="deg",
+            NumberParameter description="Engrave the circle line, depth (0 = off)" default=0 unit="mm",
+            SelectionParameter description="Ticks and labels" selection=sideSelection,
+            SelectionParameter description="Label orientation" selection=orientationSelection
+        }
+        InputDialog parameters <- circularInputs caption="Scale engraver - circular scale"
+        side = SideFromSelection(index=circularInputs[6].SelectionValue.Selected)
+        orientation = LabelOrientation.Tangential
+        if circularInputs[7].SelectionValue.Selected == 1
+            orientation = LabelOrientation.Radial
+        endif
+        if circularInputs[7].SelectionValue.Selected == 2
+            orientation = LabelOrientation.Horizontal
+        endif
+        circular = NewCircularScale(centerX=circularInputs[0].NumberValue centerY=circularInputs[1].NumberValue radius=circularInputs[2].NumberValue division=division majorTick=majorTick minorTick=minorTick mediumTick=mediumTick labelFormat=labelFormat startAngle=circularInputs[3].NumberValue endAngle=circularInputs[4].NumberValue side=side orientation=orientation baselineDepth=circularInputs[5].NumberValue)
+        EngraveCircularScale scale=circular heights=heights
+    else
+        linearInputs:InputParameter[] = {
+            NumberParameter description="Start X" default=0 unit="mm",
+            NumberParameter description="Start Y" default=0 unit="mm",
+            NumberParameter description="Scale length" default=100 unit="mm",
+            NumberParameter description="Rotation (0 = along +X)" default=0 unit="deg",
+            NumberParameter description="Engrave the scale line, depth (0 = off)" default=0 unit="mm",
+            SelectionParameter description="Ticks and labels" selection=sideSelection
+        }
+        InputDialog parameters <- linearInputs caption="Scale engraver - linear scale"
+        side = SideFromSelection(index=linearInputs[5].SelectionValue.Selected)
+        linear = NewLinearScale(originX=linearInputs[0].NumberValue originY=linearInputs[1].NumberValue scaleLength=linearInputs[2].NumberValue division=division majorTick=majorTick minorTick=minorTick mediumTick=mediumTick labelFormat=labelFormat rotationAngle=linearInputs[3].NumberValue side=side baselineDepth=linearInputs[4].NumberValue)
+        EngraveLinearScale scale=linear heights=heights
+    endif
+    Spindle Off
+    MoveToParkPosition
+endprogram
+
+end

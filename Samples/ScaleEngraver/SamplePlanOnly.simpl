@@ -1,0 +1,82 @@
+﻿module SamplePlanOnly
+
+@ Author = "Benjamin Boeck" @
+@ MeasuringSystem = "Metric" @
+@ WorkpieceGeometry :"MinEdge":{"X":0.0,"Y":0.0,"Z":-10.0},"MaxEdge":{"X":70.0,"Y":30.0,"Z":0.0}@
+
+# SAMPLE: plan a scale WITHOUT any machine motion and look at the result as data.
+#
+# Why this matters
+#   The library works in two layers. PlanLinearScale / PlanCircularScale compute everything that
+#   will be engraved - tick lines, arcs, labels - and return it as a plain ScalePlan structure.
+#   Only EngraveScalePlan turns a plan into Rapid / Line / Arc moves and text engraving. So a plan
+#   can be inspected, checked, modified or shown before a single move is made. This sample
+#   plans a ruler, shows a summary in a dialog, and engraves only after the operator confirms.
+#
+# What you see in a plan
+#   plan.lines   the baseline (if baselineDepth > 0) and one line per tick, in scale order;
+#                every line has x1/y1/x2/y2, lineDepth and isMajor
+#   plan.arcs    the baseline arc of a circular scale (empty for a ruler)
+#   plan.labels  one entry per number: text, position x/y, rotation, height, width, depth
+#
+# Modifying a plan
+#   A plan is ordinary data. The loop below doubles the depth of all major ticks before engraving
+#   - the same way you could drop labels, shift everything, or hand the plan to a preview.
+#
+# Calling program duties: tool, Rpm, Feed, Spindle On/Off. Z = 0 is the surface of the part.
+
+using Base
+using DialogUtilities
+using ScaleEngraver
+
+export program Main
+    majorTick = NewTickStyle(tickLength=6 tickDepth=0.2)
+    minorTick = NewTickStyle(tickLength=3 tickDepth=0.1)
+    mediumTick = NewTickStyle(tickLength=4.5 tickDepth=0.15)
+    division = NewScaleDivision(valueStart=0 valueEnd=50 majorStep=10 minorDivisions=10 mediumEvery=5)
+    labels = NewLabelSettings(labelHeight=3 labelDepth=0.1 skipFirstLabel=true)
+
+    ruler = NewLinearScale(
+        originX=10
+        originY=10
+        scaleLength=50
+        division=division
+        majorTick=majorTick
+        minorTick=minorTick
+        mediumTick=mediumTick
+        labelFormat=labels
+        baselineDepth=0.1
+    )
+
+    # 1) plan: pure data, nothing moves
+    plan = PlanLinearScale(scale=ruler)
+
+    # 2) look at the plan: 1 baseline + 51 ticks, 5 numbers (the 0 is skipped)
+    firstLabel = plan.labels[0].text
+    answer = Dialog Yes No message="Planned " + ValueToString(sizeof plan.lines) + " lines and " + ValueToString(sizeof plan.labels) + " labels. First number: " + firstLabel + ". Engrave now?" caption="Scale plan"
+    if answer == DialogResult.Yes
+        # 3) modify the plan: major ticks twice as deep (a loop over the lines, isMajor is set for ticks)
+        deepLines:ScaleLine[] = {}
+        foreach item in plan.lines
+            newDepth = item.lineDepth
+            if item.isMajor and item.lineDepth > 0.15
+                newDepth = item.lineDepth * 2
+            endif
+            deepLine:ScaleLine = {item.x1, item.y1, item.x2, item.y2, newDepth, item.isMajor}
+            append deepLine to deepLines
+        endforeach
+        deepPlan:ScalePlan = {deepLines, plan.arcs, plan.labels}
+
+        # 4) the caller's machine setup, then engrave the modified plan
+        Absolute
+        Rpm = 13000
+        Feed = 800
+        Spindle On
+        heights = NewEngraveHeights(retractZ=2 approachZ=0.5 safeZ=20)
+        EngraveScalePlan plan=deepPlan heights=heights
+        Spindle Off
+        MoveToParkPosition
+    endif
+endprogram
+
+end

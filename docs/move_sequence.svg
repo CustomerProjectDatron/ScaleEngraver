@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="360" viewBox="0 0 900 360" font-family="Arial, Segoe UI, sans-serif">
+<rect width="900" height="360" fill="#f5f7fa"/>
+<rect x="40" y="190" width="650" height="130" fill="#e3e8ef"/>
+<line x1="40" y1="50" x2="690" y2="50" stroke="#9aa4b2" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="4 6"/>
+<line x1="40" y1="150" x2="690" y2="150" stroke="#9aa4b2" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="4 6"/>
+<line x1="40" y1="250" x2="690" y2="250" stroke="#e8710a" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="4 6"/>
+<line x1="40" y1="190" x2="690" y2="190" stroke="#1b1f24" stroke-width="3" stroke-linecap="round" />
+<polyline points="150,250 150,50 330,50 330,150" fill="none" stroke="#1b1f24" stroke-width="3" stroke-dasharray="10 7" stroke-linejoin="round"/>
+<line x1="330" y1="150" x2="330" y2="250" stroke="#1f6feb" stroke-width="4" stroke-linecap="round" />
+<line x1="330" y1="250" x2="540" y2="250" stroke="#1f6feb" stroke-width="4" stroke-linecap="round" />
+<polyline points="540,250 540,50" fill="none" stroke="#1b1f24" stroke-width="3" stroke-dasharray="10 7"/>
+<circle cx="330" cy="250" r="6" fill="#e8710a"/>
+<text x="705" y="56" font-size="20" fill="#1b1f24" text-anchor="start" font-weight="400" >retractZ</text>
+<text x="705" y="156" font-size="20" fill="#1b1f24" text-anchor="start" font-weight="400" >approachZ</text>
+<text x="705" y="196" font-size="20" fill="#1b1f24" text-anchor="start" font-weight="700" >surface Z=0</text>
+<text x="705" y="256" font-size="20" fill="#e8710a" text-anchor="start" font-weight="700" >depth</text>
+<text x="435" y="288" font-size="20" fill="#1f6feb" text-anchor="middle" font-weight="700" >cut</text>
+</svg>

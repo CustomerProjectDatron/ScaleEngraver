@@ -1,0 +1,71 @@
+﻿module SampleDialVariants
+
+@ Author = "Benjamin Boeck" @
+@ MeasuringSystem = "Metric" @
+@ WorkpieceGeometry :"MinEdge":{"X":0.0,"Y":0.0,"Z":-10.0},"MaxEdge":{"X":180.0,"Y":60.0,"Z":0.0}@
+
+# SAMPLE: three small percent dials 0..100 side by side - the three label orientations.
+#
+# What happens
+#   Three identical full-circle scales (radius 20 mm) at X = 30, 90 and 150, all at Y = 30. They
+#   differ only in "orientation", so you can see on the part which one suits your layout:
+#
+#   Tangential  the numbers follow the circle, their top points away from the centre
+#               (the usual dial look; numbers at the bottom stand upside down)
+#   Radial      the numbers run along the radius, outwards; on the left half they are turned
+#               by 180 degrees so they stay readable from the right side
+#   Horizontal  the numbers are not rotated at all (best for small dials read from one side)
+#
+# Common settings
+#   A full circle: startAngle=90 (12 o'clock) and endAngle=startAngle-360 are the defaults, so
+#   they are not given. The closing tick at 100 coincides with the 0 at 12 o'clock and is NOT
+#   engraved twice (a 360 degree sweep drops it), the label "0" at the top stays.
+#   Values 0..100, a major tick every 10, 5 minor intervals per major interval (a tick every 2),
+#   numbers every second major tick (labelEvery=2).
+#
+# Calling program duties: tool, Rpm, Feed, Spindle On/Off. Z = 0 is the surface of the part.
+
+using Base
+using ScaleEngraver
+
+# Engraves one dial; a helper program keeps the three calls below short and identical.
+program EngraveDial (
+    centerX:number
+    orientation:LabelOrientation
+    heights:EngraveHeights
+    )
+    majorTick = NewTickStyle(tickLength=4 tickDepth=0.2)
+    minorTick = NewTickStyle(tickLength=2 tickDepth=0.1)
+    percentDivision = NewScaleDivision(valueStart=0 valueEnd=100 majorStep=10 minorDivisions=5)
+    percentLabels = NewLabelSettings(labelHeight=2.5 labelDepth=0.1 labelEvery=2)
+    dial = NewCircularScale(
+        centerX=centerX
+        centerY=30
+        radius=20
+        division=percentDivision
+        majorTick=majorTick
+        minorTick=minorTick
+        labelFormat=percentLabels
+        orientation=orientation
+        baselineDepth=0.1
+    )
+    EngraveCircularScale scale=dial heights=heights
+endprogram
+
+export program Main
+    Absolute
+    Rpm = 13000
+    Feed = 800
+    Spindle On
+
+    heights = NewEngraveHeights(retractZ=2 approachZ=0.5 safeZ=20)
+
+    EngraveDial centerX=30 orientation=LabelOrientation.Tangential heights=heights
+    EngraveDial centerX=90 orientation=LabelOrientation.Radial heights=heights
+    EngraveDial centerX=150 orientation=LabelOrientation.Horizontal heights=heights
+
+    Spindle Off
+    MoveToParkPosition
+endprogram
+
+end
