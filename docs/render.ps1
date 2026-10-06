@@ -17,3 +17,8 @@ Get-ChildItem (Join-Path $PSScriptRoot "tiles") -Filter tile_*.svg | ForEach-Obj
 }
 & $resvg --width 128 (Join-Path $PSScriptRoot "tiles\tile_logo.svg") (Join-Path $PSScriptRoot "tiles\tile_logo_128.png")
 & $resvg (Join-Path $PSScriptRoot "tiles\contact_sheet.svg") (Join-Path $PSScriptRoot "tiles\contact_sheet.png")
+
+# the README is shipped inside the package, so the images it shows live in the (packed) library folder
+$readmeImages = Join-Path $root "Library\ScaleEngraver\images\readme"
+New-Item -ItemType Directory -Force $readmeImages | Out-Null
+Copy-Item (Join-Path $PSScriptRoot "hero_ruler.png"), (Join-Path $PSScriptRoot "hero_dial.png"), (Join-Path $PSScriptRoot "protractor.png"), (Join-Path $PSScriptRoot "tiles\tile_logo_128.png") $readmeImages -Force

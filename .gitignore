@@ -9,3 +9,6 @@
 # generated
 __pycache__/
 *.pyc
+
+# built packages
+*.nextpkg

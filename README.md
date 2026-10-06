@@ -1,11 +1,11 @@
-![Scale Engraver](docs/tiles/tile_logo_128.png)
+![Scale Engraver](Library/ScaleEngraver/images/readme/tile_logo_128.png)
 
 # Scale Engraver
 
 Engrave **rulers, dials, gauges and protractors** on your part. You describe the scale - what it
 shows, where it sits, how long the ticks are - and Scale Engraver engraves every tick and number.
 
-![Ruler](docs/hero_ruler.png)
+![Ruler](Library/ScaleEngraver/images/readme/hero_ruler.png)
 
 ## What you can do
 
@@ -21,7 +21,7 @@ shows, where it sits, how long the ticks are - and Scale Engraver engraves every
 
 | | |
 |---|---|
-| ![Dial](docs/hero_dial.png) | ![Protractor](docs/protractor.png) |
+| ![Dial](Library/ScaleEngraver/images/readme/hero_dial.png) | ![Protractor](Library/ScaleEngraver/images/readme/protractor.png) |
 
 ## How to use it
 
