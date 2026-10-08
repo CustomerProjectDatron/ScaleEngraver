@@ -1,11 +1,12 @@
-# Regenerates all icons: python gen_icons.py (SVG) then resvg (PNG, 64 px). Run from any folder.
+# Regenerates all icons: gen_icons.py and gen_headers.py (SVG), then resvg (PNG): 64 px icons, 360 px header images.
 $dir = $PSScriptRoot
 $resvg = "C:\Repos\resvg.exe"
-if (Get-Command python -ErrorAction SilentlyContinue) { Push-Location $dir; python gen_icons.py; Pop-Location }
-Get-ChildItem $dir -Filter *.svg | ForEach-Object {
-    $png = [IO.Path]::ChangeExtension($_.FullName, ".png")
-    & $resvg --width 64 $_.FullName $png
+if (Get-Command python -ErrorAction SilentlyContinue) {
+    Push-Location $dir; python gen_icons.py; python gen_headers.py; Pop-Location
 }
-Write-Host "rendered" (Get-ChildItem $dir -Filter *.png).Count "icons"
-# header images of the top-level commands (wider than the 64 px parameter icons)
-Get-ChildItem $dir -Filter header_*.svg | ForEach-Object { & $resvg --width 360 $_.FullName ([IO.Path]::ChangeExtension($_.FullName, ".png")) }
+Get-ChildItem $dir -Filter *.svg | ForEach-Object {
+    $width = 64
+    if ($_.Name -like "header_*") { $width = 360 }
+    & $resvg --width $width $_.FullName ([IO.Path]::ChangeExtension($_.FullName, ".png"))
+}
+Write-Host "rendered" (Get-ChildItem $dir -Filter *.png).Count "images"

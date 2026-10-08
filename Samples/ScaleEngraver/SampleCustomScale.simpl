@@ -2,7 +2,7 @@
 
 @ Author = "Benjamin Boeck" @
 @ MeasuringSystem = "Metric" @
-@ WorkpieceGeometry :"MinEdge":{"X":0.0,"Y":0.0,"Z":-10.0},"MaxEdge":{"X":120.0,"Y":100.0,"Z":10.0}@
+@ WorkpieceGeometry :"MinEdge":{"X":0.0,"Y":0.0,"Z":-10.0},"MaxEdge":{"X":120.0,"Y":100.0,"Z":0.0}@
 
 # SAMPLE: your own scales - you say from which value to which value.
 #
@@ -18,28 +18,22 @@
 #       and a gauge that shows 20 to 80 over its sweep.
 #
 # The ticks sit on multiples of the step, so a range such as 15 to 85 starts with a short tick at 15
-# and has its long ticks at 20, 30 ... The program sets tool, Rpm, the feeds and the spindle.
+# and has its long ticks at 20, 30 ... The program sets the retract height, Rpm and the feeds;
+# the spindle is handled by the commands.
 
 using Base
 using ScaleEngraver
-import Development
-import File
-import MillingCyclesUtilities
 
 export program Main
+    Absolute
     SafeZHeightForWorkpiece = 15
-    PrePositioning
-#    MillingCyclesUtilities::ExecuteMillingCycle
- 
-    SetFeedTechnology plunge=200 finishing=800
     Rpm = 13000
-    Spindle On
-    
-    EngraveRuler X=10 Y=70 Z=10 length=100 valueStart=20 valueEnd=70 depth=1
-    EngraveRuler X=10 Y=40 Z=10 length=100 valueStart=-50 valueEnd=50
-    EngraveDial X=100 Y=20 Z=10 radius=14 kind=DialKind.Gauge valueStart=20 valueEnd=80
+    SetFeedTechnology plunge=200 finishing=800
 
-    Spindle Off
+    EngraveRuler X=10 Y=70 Z=0 length=100 valueStart=20 valueEnd=70
+    EngraveRuler X=10 Y=40 Z=0 length=100 valueStart=-50 valueEnd=50
+    EngraveDial X=100 Y=20 Z=0 radius=14 kind=DialKind.Gauge valueStart=20 valueEnd=80
+
     MoveToParkPosition
 endprogram
 

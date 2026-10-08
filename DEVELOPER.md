@@ -35,7 +35,7 @@ Not part of the package (the package only contains `Library/`, `Samples/` and `T
   value can be overridden.
 * **Core** (module `ScaleEngraverCore`): parameter structures, `Plan...Scale` returns a `ScalePlan`
   (lines, arcs, labels as data), `EngraveScalePlan` turns it into motion. Pure motion: the **calling
-  program** selects the tool and sets `Rpm`, `SafeZHeightForWorkpiece`, `SetFeedTechnology plunge= finishing=`; `EngraveRuler`/`EngraveDial` run their motion inside `MillingCyclesUtilities::ExecuteMillingCycle`, which handles the spindle (and the machine state), so the samples have no `Spindle On/Off`. The plan layer is kept for
+  program** selects the tool and sets `Rpm`, `SafeZHeightForWorkpiece`, `SetFeedTechnology plunge= finishing=`; `EngraveRuler`/`EngraveDial`/`EngraveAngleScale` run their motion inside `MillingCyclesUtilities::ExecuteMillingCycle`, which handles the spindle (and the machine state), so the samples have no `Spindle On/Off`. The plan layer is kept for
   the tests and for a later preview / web API; it is not part of the user surface.
 ### Move sequence
 
@@ -102,3 +102,27 @@ describe every parameter.
 * **The library module must not declare a measuring system** (no `@ MeasuringSystem = ... @` in its header). With `Metric` in the library header, calling it from an inch program (or after `ImperialMeasuring`) faulted at the first call in the isolated simulator.
 * `FractionScale` (`NewFractionScale`, `PlanFractionScale`, `EngraveFractionScale`) is the inch ruler: the unit is halved `levels` times, level = number of halvings needed to reach a tick (whole units 0, halves 1 ...), one `TickStyle` per level, unit numbers from `unitLabel`, fractions (fractional part only, via `FractionText`) from `fractionLabel` down to `fractionLabelLevel`.
 * Fraction labels: `FractionText` rounds to the nearest 1/denominator, reduces with gcd and writes mixed numbers (tested: 1/8, 1/4, 3/8, 1/2, 1 1/2, 2 13/16, 3/10, -3/4).
+
+## Angle scale (speed square)
+
+`EngraveAngleScale` takes the pivot and the scale line (start point plus end point, or length and direction). It computes
+the foot of the perpendicular from the pivot (`alongPivot`), the distance (`|acrossPivot|`) and the true angles at the
+start and the end (`atan`). It then uses a normal `LinearScale` with `angleDistance` = distance and
+`angleOffset` = true start angle - `angleStart`: the value v sits at `distance * (tan(v + offset) - tan(valueStart + offset))`
+from the origin, and the tick direction is rotated by the true angle so that every tick points to the pivot. The ticks are
+placed on whole degrees of the value, so the numbers start at the start point with `angleStart` (default 0). The side of the
+ticks follows the side of the pivot.
+
+## Leaving out numbers and ticks
+
+`skipFirst`/`skipLast` of the commands are label counts (`LabelSettings.skipFirstLabel/skipLastLabel`): the plans build all
+labels and `TrimLabels` drops the first / last n in scale order (for the inch ruler the fractions count, too); the ticks stay.
+`skipFirstTicks`/`skipLastTicks` are tick counts (`ScaleDivision.skipFirstTick/skipLastTick`): every tick counts, the labels
+of removed ticks disappear with them. `numbers=false` is a label skip of 1000000.
+
+## Editor quirks
+
+The control's editor rejects some sources that `check_simpl_source` accepts (the simulation refuses to start with
+"Load a program without errors"): a program call nested in a parameter (`division=NewScaleDivision(...)`) and, it seems,
+`sizeof a.b == n` inside a condition. Use a variable first. An editor tab with an old unsaved version of a file also blocks
+loading the new one - close it without saving.

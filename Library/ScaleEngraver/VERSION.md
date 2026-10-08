@@ -1,10 +1,16 @@
+# ScaleEngraver v1.1.0
+
+One command per scale, heights and feeds like the DATRON milling cycles.
+
+- `EngraveRuler`, `EngraveDial` and `EngraveAngleScale` (speed square) with defaults for ticks, numbers and depth
+- One tick length plus a factor for all tick levels; millimetre, centimetre and inch rulers; degree, percent, gauge,
+  protractor and clock dials
+- Own scales from `valueStart` to `valueEnd`; ticks on multiples of the step
+- Position with `X Y Z`, depth measured from `Z`, `feedHeight`, `infeedZ` (also for the numbers),
+  `PrePositioning` over `SafeZHeightForWorkpiece`, feeds from `SetFeedTechnology`, spindle handled by `ExecuteMillingCycle`
+- `skipFirst` / `skipLast` leave out numbers, `skipFirstTicks` / `skipLastTicks` leave out ticks
+- Header images and icons in the command help, commented samples and an operator dialog app
+
 # ScaleEngraver v1.0.0
 
-Initial release.
-
-- Linear and circular scales with major, medium and minor ticks and value labels
-- Skip options for ticks and labels, label every n-th major tick
-- Circular scales over any sweep, clockwise or counter-clockwise; labels tangential, radial or horizontal
-- Planning layer (pure data) and engraving layer; the calling program sets tool, `Rpm`, `Feed` and spindle
-- Approach height above the surface; text engraved with its own approach levels
-- Operator dialog app and commented samples (inch ruler, protractor, gauge, edge ruler, dial variants, plan only)
+Initial release: linear and circular scales with major, medium and minor ticks, plan and engrave layers, samples.

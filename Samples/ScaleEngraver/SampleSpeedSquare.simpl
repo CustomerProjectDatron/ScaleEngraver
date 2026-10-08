@@ -4,22 +4,22 @@
 @ MeasuringSystem = "Metric" @
 @ WorkpieceGeometry :"MinEdge":{"X":0.0,"Y":0.0,"Z":-10.0},"MaxEdge":{"X":150.0,"Y":150.0,"Z":0.0}@
 
-# SAMPLE: an angle scale on a straight edge, like on a speed square.
+# SAMPLE: a speed square - the angle scale on its 45 degree edge and a millimetre ruler along the bottom edge.
 #
-# You give three things: the PIVOT (the corner of the square the angles are measured from, nothing is engraved there),
-# the START of the scale line and its END (or its length and direction). The numbers start at the start point with 0.
+# The square has its corner at (0, 0) and its legs along X and Y, 150 mm long.
 #
-#   EngraveAngleScale X=10 Y=70 Z=0 EndX=60 EndY=70 PivotX=10 PivotY=20
-#       the line runs from (10, 70) to (60, 70), the pivot is 50 mm below its start. The 0 is at the start point and the
-#       45 at its end (the angle swept as seen from the pivot). Every tick is radial, pointing to the pivot: a tick every
-#       degree, a longer one every 5, a number every 10 degrees.
+#   EngraveAngleScale X=150 Y=0 Z=0 EndX=0 EndY=150 PivotX=0 PivotY=0 skipFirst=1 skipLast=1
+#       the scale runs along the 45 degree edge from (150, 0) to (0, 150). The PIVOT is the corner (0, 0): every tick points
+#       to it and the angles are seen from there, so the scale counts 0 to 90 degrees from the start point. A tick every
+#       degree, a longer one every 5, a number every 10 degrees. skipFirst=1 / skipLast=1 leave out the numbers 0 and 90
+#       in the tight corners; their ticks stay.
 #
-#   EngraveAngleScale X=80 Y=50 Z=0 length=65 angle=0 PivotX=75 PivotY=20 majorStep=5 angleStart=10
-#       the pivot is not above the start: the ticks lean, and the scale covers about 57 degrees over its 65 mm. angleStart=10
-#       defines your own start value, here the first tick shows 10 and the numbers continue from there.
+#   EngraveRuler X=0 Y=0 Z=0 length=150 skipFirst=1 skipLast=2
+#       a millimetre ruler along the bottom edge; the number 0 at the corner and the last two numbers are left out.
 #
-# The distances between the ticks follow the geometry of the pivot (tan), the numbers are your choice.
-# The program sets the retract height (SafeZHeightForWorkpiece), Rpm and the feeds; the spindle is handled by the commands.
+# Instead of the end point the scale line can be given with length= and angle=, and angleStart= sets the number at the
+# start point. The program sets the retract height (SafeZHeightForWorkpiece), Rpm and the feeds; the spindle is handled
+# by the commands.
 
 using Base
 using ScaleEngraver
@@ -31,7 +31,7 @@ export program Main
     SetFeedTechnology plunge=200 finishing=800
 
     EngraveAngleScale X=150 Y=0 Z=0 EndX=0 EndY=150 PivotX=0 PivotY=0 skipFirst=1 skipLast=1
-    EngraveRuler(X=0 Y=0 Z=0 length=150 Millimeter skipLast=2 skipFirst=1)
+    EngraveRuler X=0 Y=0 Z=0 length=150 skipFirst=1 skipLast=2
 
     MoveToParkPosition
 endprogram
