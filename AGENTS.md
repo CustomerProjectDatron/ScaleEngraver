@@ -7,6 +7,15 @@ SimPL has no standalone compiler, so a control is used as one — and as the sou
 live catalog of commands actually installed. The machine is infrastructure for writing
 code; nothing here runs programs.
 
+## A new project — the first five minutes, in this order
+
+1. `simpl-mcp doctor` is green (reach, sign-in). Missing: the operator runs `simpl-mcp login`.
+2. `simpl-skill new <Name> --install`: the scaffold plus these skills.
+3. Developer Mode is on, or the operator can run one elevated command. **Ask now.**
+4. `simpl-pkg install --dev` links the project to the control. This is part of the task and needs
+   no further confirmation. Without it, nothing that imports the library compiles.
+5. Only then write `.simpl`.
+
 ## The skills
 
 | Task | Skill |
@@ -45,7 +54,9 @@ Loop details: `.agents/skills/simpl/references/compiler-validation.md`.
 carries what a run reported. Executing a program, moving an axis and writing a variable are
 deliberately unreachable — running programs is the operator's job. The only writes are
 `next_editor`'s: open a program in the editor, start the editor's simulation, show a screen,
-upload a compiled one-off program below `machine:AgentPrograms/`. Say a capability does not
+upload a compiled one-off program below `machine:AgentPrograms/` — and `reload_simpl_libraries`,
+which makes new or changed library modules callable (compile them first; source files are never
+touched). Say a capability does not
 exist rather than reaching for raw HTTP. Credentials missing or `401`: stop and ask the
 operator to run `simpl-mcp login` themselves.
 

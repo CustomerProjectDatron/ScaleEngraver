@@ -1,8 +1,7 @@
 ﻿module ScaleEngraver
 
-@ UserVisible = false @
-@ SystemModule = true @
 @ Author = "Benjamin Boeck" @
+@ SystemModule = true @
 
 # ScaleEngraver: engraves rulers and dials with ONE command each.
 #

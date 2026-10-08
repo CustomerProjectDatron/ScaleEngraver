@@ -13,6 +13,34 @@ EngraveAngleScale X=150 Y=0 Z=0 EndX=0 EndY=150 PivotX=0 PivotY=0
 
 ![Ruler](Library/ScaleEngraver/images/readme/hero_ruler.png)
 
+## Example: a speed square - several scales on one part
+
+![Speed square, simulated part seen from above](Samples/ScaleEngraver/images/SampleSpeedSquare.png)
+
+Every command engraves one scale, so a part with several scales is simply several lines in one program. The sample
+`SampleSpeedSquare` engraves four scales on a 150 mm square plate and then mills the 45 degree edge (the picture is the
+simulated part, seen from above):
+
+```
+size = 150
+EngraveAngleScale X=size Y=0 Z=0 EndX=0 EndY=size PivotX=0 PivotY=0 skipFirst=1 skipLast=1 depth=0.8
+EngraveRuler X=0 Y=0 Z=0 length=size skipFirst=1 skipLast=2 depth=0.8
+EngraveRuler X=0 Y=0 Z=0 length=size angle=90 kind=ScaleKind.Inch below=true skipFirst=1 skipLast=2 depth=0.8
+EngraveDial  X=0 Y=0 Z=0 radius=size * 95 / 150 startAngle=80 endAngle=10 valueStart=10 valueEnd=80 inside=true depth=0.8
+```
+
+- **One coordinate system for all scales.** The corner of the square is (0, 0); every scale is placed relative to it.
+- **The angle scale** runs along the 45 degree edge. Its pivot is the corner, so every tick points to the corner and the
+  numbers count 0 to 90 degrees.
+- **Two rulers** share the corner: millimetres along the bottom edge, inches along the left edge (`angle=90` turns the
+  ruler upwards, `below=true` puts the ticks on the inside).
+- **The dial** is a protractor arc around the same corner, from 10 to 80 degrees, ticks inside.
+- **Clean corners.** `skipFirst` and `skipLast` leave out the numbers that would collide in the corners; the ticks stay.
+- **One size.** `size` sets the plate; all scales follow it.
+- **Engrave, then mill.** After the engraving the program changes to a 6 mm end mill and cuts the 45 degree edge through
+  the plate: tool radius compensation, approach and leave moves outside the plate, several infeeds. Engraving and milling
+  run in one program with two tools.
+
 ## The commands
 
 **EngraveRuler** - a straight scale
@@ -109,7 +137,7 @@ Every sample is only a few lines and commented; copy the one that is closest to 
 | `SampleInchRuler` | an inch ruler (inch, 1/2, 1/4, 1/8, 1/16), programmed completely in inch |
 | `SampleProtractor` | a half circle 0 to 180 degrees, ticks and numbers inside |
 | `SampleGauge` | a 270 degree gauge 0 to 100 |
-| `SampleSpeedSquare` | a speed square: 0 to 90 degrees on the 45 degree edge, seen from the corner, and a millimetre ruler along the bottom edge |
+| `SampleSpeedSquare` | a complete speed square: angle scale, millimetre and inch ruler, protractor arc, then the 45 degree edge milled with a 6 mm end mill |
 | `SampleClock` | a clock face: 12 hour numbers and 60 minute ticks inside the circle |
 | `SampleCustomScale` | your own scales: a ruler from 20 to 70, one from -50 to 50, a gauge from 20 to 80 |
 | `SampleEdgeRuler` | a vertical centimetre ruler along a part edge; the tick on the edge is left out (`skipFirstTicks`) |

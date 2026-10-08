@@ -24,6 +24,18 @@ cut between two ticks.
 Start the sample program **ScaleEngraverApp** and answer a few dialogs. To engrave a scale from your own
 program, copy one of the commented samples.
 
+## Example: a speed square
+
+![Speed square, simulated part seen from above](../../Samples/ScaleEngraver/images/SampleSpeedSquare.png)
+
+The sample `SampleSpeedSquare` shows how several scales come together on one part. On a 150 mm square plate it
+engraves an angle scale along the 45 degree edge (0 to 90 degrees, every tick pointing to the corner), a millimetre
+ruler along the bottom edge, an inch ruler along the left edge and a protractor arc from 10 to 80 degrees around the
+corner - four lines of program, all placed from the same corner. The numbers that would collide in the corners are
+left out. Then the program changes to a 6 mm end mill and cuts the 45 degree edge through the plate with tool radius
+compensation, approach and leave moves outside the plate and several infeeds. One value, `size`, sets the plate and
+every scale follows it.
+
 ## What it can do
 
 - Engrave millimetre and centimetre rulers, and real inch rulers (inch, 1/2, 1/4, 1/8, 1/16 with fractions)
@@ -53,4 +65,5 @@ program, copy one of the commented samples.
 
 - Library `ScaleEngraver` - the commands `EngraveRuler`, `EngraveDial` and `EngraveAngleScale`
 - Sample `ScaleEngraverApp` - asks for the scale in two dialogs and engraves it
-- Samples `ScaleEngraverSample`, `SampleInchRuler`, `SampleProtractor`, `SampleGauge`, `SampleClock`, `SampleSpeedSquare`, `SampleCustomScale`, `SampleEdgeRuler`, `SampleDialVariants` - short commented examples to copy from
+- Sample `SampleSpeedSquare` - a complete speed square: four scales engraved, then the 45 degree edge milled
+- Samples `ScaleEngraverSample`, `SampleInchRuler`, `SampleProtractor`, `SampleGauge`, `SampleClock`, `SampleCustomScale`, `SampleEdgeRuler`, `SampleDialVariants` - short commented examples to copy from

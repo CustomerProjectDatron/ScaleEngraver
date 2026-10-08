@@ -4,36 +4,144 @@
 @ MeasuringSystem = "Metric" @
 @ WorkpieceGeometry :"MinEdge":{"X":0.0,"Y":0.0,"Z":-10.0},"MaxEdge":{"X":150.0,"Y":150.0,"Z":0.0}@
 
-# SAMPLE: a speed square - the angle scale on its 45 degree edge and a millimetre ruler along the bottom edge.
+# SAMPLE: a speed square - scales engraved on a square plate, then the 45 degree edge milled out.
 #
-# The square has its corner at (0, 0) and its legs along X and Y, 150 mm long.
+# The plate is a square with its corner at (0, 0) and its sides along X and Y. size sets the side length (150 mm here);
+# change it for another square and set the workpiece above to the same size. Z = 0 is the top of the plate.
 #
-#   EngraveAngleScale X=150 Y=0 Z=0 EndX=0 EndY=150 PivotX=0 PivotY=0 skipFirst=1 skipLast=1
-#       the scale runs along the 45 degree edge from (150, 0) to (0, 150). The PIVOT is the corner (0, 0): every tick points
-#       to it and the angles are seen from there, so the scale counts 0 to 90 degrees from the start point. A tick every
-#       degree, a longer one every 5, a number every 10 degrees. skipFirst=1 / skipLast=1 leave out the numbers 0 and 90
-#       in the tight corners; their ticks stay.
+# 1. Engraving tool
+#    EngraveAngleScale  along the 45 degree edge from (size, 0) to (0, size). The PIVOT is the corner (0, 0): every tick
+#                       points to it and the scale counts 0 to 90 degrees. skipFirst=1 / skipLast=1 leave out the numbers
+#                       0 and 90 in the tight corners; their ticks stay.
+#    EngraveRuler       a millimetre ruler along the bottom edge and an inch ruler along the left edge.
+#    EngraveDial        an arc 10 to 80 degrees around the corner.
 #
-#   EngraveRuler X=0 Y=0 Z=0 length=150 skipFirst=1 skipLast=2
-#       a millimetre ruler along the bottom edge; the number 0 at the corner and the last two numbers are left out.
+# 2. 6 mm end mill: the 45 degree edge from the upper left corner (0, size) to the lower right corner (size, 0), cut
+#    through the plate in steps of infeed with tool radius compensation. Every step starts outside the plate:
+#      approach move  from the waste side onto the extended edge - the compensation switches on during this move
+#      cut            along the edge, the tool on the waste side (upper right, compensation left)
+#      leave move     away from the edge - the compensation switches off
+#    The finished edge lies exactly on the line of the angle scale, the ticks point inwards and stay.
 #
-# Instead of the end point the scale line can be given with length= and angle=, and angleStart= sets the number at the
-# start point. The program sets the retract height (SafeZHeightForWorkpiece), Rpm and the feeds; the spindle is handled
-# by the commands.
+# The engraving commands take care of the spindle; Tool ... newRpm= sets the speed of each tool.
 
 using Base
 using ScaleEngraver
+import Math
+import AxisSystem
 
 export program Main
+    # the plate - change it here (and the workpiece geometry above)
+    size = 150
+    thickness = 10
+
     Absolute
-    SafeZHeightForWorkpiece = 15
-    Rpm = 13000
+    SafeZHeightForWorkpiece = 3
+
+    # 1. engrave with the engraving tool
+    Tool type="0068510" newRpm=35000
     SetFeedTechnology plunge=200 finishing=800
 
-    EngraveAngleScale X=150 Y=0 Z=0 EndX=0 EndY=150 PivotX=0 PivotY=0 skipFirst=1 skipLast=1
-    EngraveRuler X=0 Y=0 Z=0 length=150 skipFirst=1 skipLast=2
+    EngraveAngleScale(
+        X=size
+        Y=0
+        Z=0
+        EndX=0
+        EndY=size
+        PivotX=0
+        PivotY=0
+        skipFirst=1
+        skipLast=1
+        depth=.8
+       
+    )
+    EngraveRuler(
+        X=0
+        Y=0
+        Z=0
+        length=size
+        skipFirst=1
+        skipLast=2
+        depth=.8
+    )
+    EngraveRuler(
+        X=0
+        Y=0
+        Z=0
+        length=size
+        angle=90
+        skipFirst=1
+        skipLast=2
+        depth=.8
+        Inch
+        below
+    )
+    EngraveDial(
+        X=0
+        Y=0
+        Z=0
+        radius=size * 95 / 150
+        startAngle=80
+        endAngle=10
+        valueStart=10
+        valueEnd=80
+        inside
+        depth=.8
+    )
+
+    # 2. mill the 45 degree edge with the 6 mm end mill
+    Tool type="0068960E" newRpm=18000
+    #    Rpm = 35000
+    SetFeedTechnology approach=600 plunge=400 roughing=1200
+
+    CutDiagonalEdge size=size thickness=thickness infeed=2 lead=15
 
     MoveToParkPosition
+endprogram
+
+# Cuts the 45 degree edge from (0, size) to (size, 0) through the plate, with tool radius compensation on the left side
+# of the cutting direction (the waste side). Every step: approach from outside, cut, leave, compensation off.
+program CutDiagonalEdge (
+    size:number
+    @doc: Side length of the square plate.@
+    thickness:number
+    @doc: Thickness of the plate; the cut goes 0.5 mm deeper so that the waste comes off.@
+    infeed:number
+    @doc: Maximum depth per cut.@
+    lead:number
+    @doc: Length of the approach and leave moves and of the extension of the edge beyond the plate; larger than the tool radius.@
+    )
+    d = 1 / Math::Sqrt(2)
+    # the edge, extended by lead beyond both corners (outside the plate)
+    startX = -lead * d
+    startY = size + lead * d
+    endX = size + lead * d
+    endY = -lead * d
+    # approach and leave points: lead away from the edge on the waste side
+    approachX = startX + lead * d
+    approachY = startY + lead * d
+    leaveX = endX + lead * d
+    leaveY = endY + lead * d
+
+    cutDepth = thickness + 0.5
+    passes = Math::Ceiling(cutDepth / infeed)
+    for k from 1 to passes
+        cutZ = 0 - Math::Min(cutDepth, k * infeed)
+        PrePositioning X=approachX Y=approachY Z=1
+        Feed technology=FeedTechnologies.Plunge
+        Line Z=cutZ
+        ToolCompensation Left
+        # approach move: the compensation is built up while moving onto the extended edge
+        Feed technology=FeedTechnologies.Approach
+        Line X=startX Y=startY
+        Feed technology=FeedTechnologies.Roughing
+        Line X=endX Y=endY
+        # leave move: away from the edge, the compensation is taken back
+        Feed technology=FeedTechnologies.Approach
+        ToolCompensation Off
+        Line X=leaveX Y=leaveY
+    endfor
+    PrePositioning Z=AxisSystem::SafeZHeightForWorkpiece
 endprogram
 
 end
