@@ -112,6 +112,7 @@ SURF = 42
 PATH = "M6,22 H18 V54 H34 V22 H46 V8 H58"
 def side(level_y):
     return line(4, SURF, 60, SURF, L, 3) + line(4, level_y, 60, level_y, B, 3, "4 4") + path(PATH, G, 3)
+icons["angleDistance"] = line(4, 50, 60, 50, G, 3) + circle(14, 14, 3.5, B, 2.5, B) + "".join(line(14, 14, x, 50, L, 2) for x in (14, 30, 46)) + line(14, 14, 58, 50, B, 2.5) + dim(60, 14, 60, 50, B, 2.5, 4) + "".join(line(x, 50, x, 42, G, 3) for x in (14, 30, 46, 58))
 icons["referenceZ"] = line(4, 54, 60, 54, L, 2.5, "4 4") + line(4, 28, 60, 28, G, 3.5) + dim(32, 54, 32, 28, B, 2.5, 4)
 icons["feedHeight"] = line(4, 44, 60, 44, L, 3) + line(4, 26, 60, 26, B, 2.5, "4 4") + path("M20,6 V26", G, 3) + line(20, 26, 20, 56, B, 4) + dim(46, 44, 46, 26, B, 2.5, 4)
 icons["infeedZ"] = line(4, 14, 60, 14, L, 3) + line(14, 30, 54, 30, B, 2.5, "4 4") + line(14, 46, 54, 46, B, 2.5, "4 4") + path("M10,6 V14 L14,14 V30 H50 V46 H14", G, 3) + dim(58, 14, 58, 30, B, 2.5, 4)

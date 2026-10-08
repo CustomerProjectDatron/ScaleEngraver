@@ -38,7 +38,7 @@ export program Main
             NumberParameter description="Longest tick" default=6 unit="mm",
             NumberParameter description="Depth" default=0.1 unit="mm",
             BooleanParameter description="Ticks and numbers below / right of the direction" default=false,
-            BooleanParameter description="Leave out the first tick and number (part edge)" default=false
+            NumberParameter description="Ticks to leave out at the start (1 at a part edge)" default=0
         }
         InputDialog parameters <- rulerInputs caption="Scale engraver - ruler"
         chosenRuler = ScaleKind.Millimeter
@@ -55,7 +55,7 @@ export program Main
         SafeZHeightForWorkpiece = 15
         Rpm = rpmValue
         SetFeedTechnology plunge=plungeValue finishing=feedValue
-        EngraveRuler X=rulerInputs[0].NumberValue Y=rulerInputs[1].NumberValue Z=0 length=rulerInputs[2].NumberValue kind=chosenRuler angle=rulerInputs[3].NumberValue tickLength=rulerInputs[4].NumberValue depth=rulerInputs[5].NumberValue below=rulerInputs[6].BooleanValue skipFirst=rulerInputs[7].BooleanValue
+        EngraveRuler X=rulerInputs[0].NumberValue Y=rulerInputs[1].NumberValue Z=0 length=rulerInputs[2].NumberValue kind=chosenRuler angle=rulerInputs[3].NumberValue tickLength=rulerInputs[4].NumberValue depth=rulerInputs[5].NumberValue below=rulerInputs[6].BooleanValue skipFirstTicks=rulerInputs[7].NumberValue
     else
         dialInputs:InputParameter[] = {
             NumberParameter description="Centre X" default=60 unit="mm",
@@ -63,7 +63,7 @@ export program Main
             NumberParameter description="Radius" default=30 unit="mm",
             NumberParameter description="Longest tick" default=6 unit="mm",
             NumberParameter description="Depth" default=0.1 unit="mm",
-            BooleanParameter description="Leave out the first tick and number" default=false
+            NumberParameter description="Numbers to leave out at the start" default=0
         }
         InputDialog parameters <- dialInputs caption="Scale engraver - dial"
         chosenDial = DialKind.Degrees
@@ -83,7 +83,7 @@ export program Main
         SafeZHeightForWorkpiece = 15
         Rpm = rpmValue
         SetFeedTechnology plunge=plungeValue finishing=feedValue
-        EngraveDial X=dialInputs[0].NumberValue Y=dialInputs[1].NumberValue Z=0 radius=dialInputs[2].NumberValue kind=chosenDial tickLength=dialInputs[3].NumberValue depth=dialInputs[4].NumberValue skipFirst=dialInputs[5].BooleanValue
+        EngraveDial X=dialInputs[0].NumberValue Y=dialInputs[1].NumberValue Z=0 radius=dialInputs[2].NumberValue kind=chosenDial tickLength=dialInputs[3].NumberValue depth=dialInputs[4].NumberValue skipFirst=dialInputs[5].NumberValue
     endif
     MoveToParkPosition
 endprogram

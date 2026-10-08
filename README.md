@@ -2,7 +2,7 @@
 
 # Scale Engraver
 
-Engrave **rulers and dials** on your part with **one command each**. You say where the scale goes and how
+Engrave **rulers, dials and angle scales** on your part with **one command each**. You say where the scale goes and how
 big it is - the ticks, the numbers, the depth and the heights come from sensible defaults.
 
 ```
@@ -24,7 +24,8 @@ EngraveDial  X=60 Y=60 Z=0 radius=28
 | `majorStep` | value distance between two numbered ticks | 10 (mm), 1 (cm, inch); automatic for your own range |
 | `angle` | direction: 0 = to the right, 90 = upwards | 0 |
 | `below` | ticks and numbers on the other side of the line | false |
-| `skipFirst`, `skipLast` | leave out the first / last tick with its number (part edge) | false |
+| `skipFirst`, `skipLast` | number of **numbers** to leave out at the start / end; the ticks stay | 0 |
+| `skipFirstTicks`, `skipLastTicks` | number of **ticks** to leave out at the start / end, together with their numbers (e.g. 1 at a part edge) | 0 |
 | `numbers` | false = ticks only | true |
 | `levels`, `fractionLevel` | inch ruler: halve down to 1/16 (4) or 1/32 (5); fractions get numbers down to quarters (2) | 4, 2 |
 
@@ -38,9 +39,25 @@ EngraveDial  X=60 Y=60 Z=0 radius=28
 | `majorStep` | distance between long ticks | from the kind; automatic for your own range |
 | `startAngle`, `endAngle` | where the scale starts and ends (0 = right, 90 = 12 o'clock, smaller end angle = clockwise) | from the kind |
 | `inside`, `orientation` | ticks inside the circle; numbers `Tangential`, `Radial` or `Horizontal` | from the kind |
-| `skipFirst`, `skipLast`, `numbers` | as for the ruler | false, false, true |
+| `skipFirst`, `skipLast`, `skipFirstTicks`, `skipLastTicks`, `numbers` | as for the ruler | 0, 0, 0, 0, true |
 
-Both commands also take the settings below.
+**EngraveAngleScale** - an angle scale on a straight edge, like a speed square
+
+![Angle scale](Library/ScaleEngraver/images/header_EngraveAngleScale.png)
+
+| Setting | Meaning | Default |
+|---------|---------|---------|
+| `X`, `Y`, `Z` | start of the scale line (Z = height of the surface) | required |
+| `PivotX`, `PivotY` | the pivot, the corner of the square the angles are measured from (nothing is engraved there) | required |
+| `EndX`, `EndY` | end of the scale line | |
+| `length`, `angle` | instead of the end point: length and direction of the line (0 = to the right, 90 = upwards) | angle 0 |
+| `angleStart` | the angle value at the start point; the numbers count from there | 0 |
+| `majorStep` | angle between two numbered ticks | 10 |
+| `skipFirst`, `skipLast`, `skipFirstTicks`, `skipLastTicks`, `numbers` | as for the ruler | 0, 0, 0, 0, true |
+
+Give the end point **or** the length. The ticks are placed by the angle as seen from the pivot, so they get farther apart the farther they are from the foot of the perpendicular (`distance * tan`). The numbers start at the start point with 0 (or with `angleStart`) and count the angle swept as seen from the pivot. The ticks are radial: each one points to the pivot, so they lean more the farther they are from the foot. There is a tick every degree and a longer one every 5 degrees.
+
+All commands also take the settings below.
 
 | Setting | Meaning | Default |
 |---------|---------|---------|
@@ -91,6 +108,7 @@ Every sample is only a few lines and commented; copy the one that is closest to 
 | `SampleInchRuler` | an inch ruler (inch, 1/2, 1/4, 1/8, 1/16), programmed completely in inch |
 | `SampleProtractor` | a half circle 0 to 180 degrees, ticks and numbers inside |
 | `SampleGauge` | a 270 degree gauge 0 to 100 |
+| `SampleSpeedSquare` | angle scales on a straight edge, like a speed square: 0 to 45 and 15 to 60 degrees |
 | `SampleClock` | a clock face: 12 hour numbers and 60 minute ticks inside the circle |
 | `SampleCustomScale` | your own scales: a ruler from 20 to 70, one from -50 to 50, a gauge from 20 to 80 |
 | `SampleEdgeRuler` | a vertical centimetre ruler along a part edge; the tick on the edge is left out |

@@ -44,7 +44,21 @@ def dial():
             s += glyph(cx + rl * math.cos(a), cy - rl * math.sin(a), B, 0.5)
     return s + f'<circle cx="{cx}" cy="{cy}" r="3.5" fill="{G}"/>'
 
-for name, body in (("header_EngraveRuler", ruler()), ("header_EngraveDial", dial())):
+def angle_scale():
+    # a speed square scale: ticks every degree, spacing grows with the tangent, ticks radial to the pivot (above, out of the image)
+    x0, base, d = 40, 100, 280 / math.tan(math.radians(45))
+    s = line(x0, base, x0 + d * math.tan(math.radians(45)), base, G, 3.5)
+    for deg in range(0, 46):
+        x = x0 + d * math.tan(math.radians(deg))
+        sa, ca = math.sin(math.radians(deg)), math.cos(math.radians(deg))
+        L, col, w = (36, B, 4) if deg % 10 == 0 else ((26, G, 3.5) if deg % 5 == 0 else (18, G, 3))
+        s += line(x, base, x - L * sa, base - L * ca, col, w)
+        if deg % 10 == 0 and deg:
+            r = L + 14
+            s += glyph(x - r * sa, base - r * ca, B, 0.6)
+    return s
+
+for name, body in (("header_EngraveRuler", ruler()), ("header_EngraveAngleScale", angle_scale()), ("header_EngraveDial", dial())):
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">'
            f'<rect width="{W}" height="{H}" fill="#ffffff"/>{body}</svg>\n')
     with open(os.path.join(OUT, name + ".svg"), "w", encoding="utf-8", newline="\n") as f:

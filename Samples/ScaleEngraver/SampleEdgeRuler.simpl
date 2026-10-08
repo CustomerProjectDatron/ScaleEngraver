@@ -6,13 +6,14 @@
 
 # SAMPLE: a vertical centimetre ruler along the left edge of a part, ticks pointing into the part.
 #
-#   EngraveRuler X=0 Y=20 Z=0 length=100 kind=ScaleKind.Centimeter angle=90 below=true skipFirst=true
+#   EngraveRuler X=0 Y=20 Z=0 length=100 kind=ScaleKind.Centimeter angle=90 below=true skipFirstTicks=1
 #
 #   kind=Centimeter   same ticks as a millimetre ruler, the numbers are centimetres: 1, 2, 3 ... 10
 #   angle=90          the ruler runs upwards (+Y); 0 = to the right
 #   below=true        ticks and numbers on the right-hand side of the running direction, which is the
 #                     part side (+X) of the edge X = 0; the default is the left-hand side
-#   skipFirst=true    no tick and no number at 0, directly on the edge of the part
+#   skipFirstTicks=1  no tick and no number at 0, directly on the edge of the part
+#                     (skipFirst=1 would keep the tick and leave out only the number 0)
 #
 # The program selects the tool and sets Rpm and the feeds; the spindle is handled by the commands. Z = 0 is the surface of the part.
 
@@ -25,7 +26,7 @@ export program Main
     Rpm = 13000
     SetFeedTechnology plunge=200 finishing=800
 
-    EngraveRuler X=0 Y=20 Z=0 length=100 kind=ScaleKind.Centimeter angle=90 below=true skipFirst=true
+    EngraveRuler X=0 Y=20 Z=0 length=100 kind=ScaleKind.Centimeter angle=90 below=true skipFirstTicks=1
 
     MoveToParkPosition
 endprogram

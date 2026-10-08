@@ -79,14 +79,14 @@ Gap in mm between the end of the major tick and the text.@,
         @doc: ![](images/labelEvery.png)
 
 1 labels every major tick, 2 every second major tick and so on.@,
-    skipFirstLabel:boolean
+    skipFirstLabel:number
         @doc: ![](images/skipFirstLabel.png)
 
-No label at the first major tick, e.g. when it lies on the border of the part.@,
-    skipLastLabel:boolean
+Number of labels left out at the start of the scale; the ticks stay. 0 = none.@,
+    skipLastLabel:number
         @doc: ![](images/skipLastLabel.png)
 
-No label at the last major tick. Ignored for a closed 360 degree circle.@,
+Number of labels left out at the end of the scale; the ticks stay. 0 = none.@,
     fractionDenominator:number
         @doc: ![](images/fractionDenominator.png)
 
@@ -107,14 +107,14 @@ Value distance between two major ticks.@,
         @doc: ![](images/minorDivisions.png)
 
 Number of minor intervals per major interval. 10 gives nine minor ticks between two major ticks.@,
-    skipFirstTick:boolean
+    skipFirstTick:number
         @doc: ![](images/skipFirstTick.png)
 
-Do not engrave the tick (and its label) at valueStart, e.g. when it lies on the edge of the part.@,
-    skipLastTick:boolean
+Number of ticks (with their labels) left out at the start of the range, e.g. 1 when the first tick lies on the edge of the part. 0 = none.@,
+    skipLastTick:number
         @doc: ![](images/skipLastTick.png)
 
-Do not engrave the tick (and its label) at the end of the range.@,
+Number of ticks (with their labels) left out at the end of the range. 0 = none.@,
     mediumEvery:number
         @doc: ![](images/mediumEvery.png)
 
@@ -153,7 +153,11 @@ Side of the scale line on which ticks and labels are engraved.@,
     baselineDepth:number
         @doc: ![](images/baselineDepth.png)
 
-Depth of the scale line itself in mm (positive = depth below the surface); 0 = the line is not engraved.@
+Depth of the scale line itself in mm (positive = depth below the surface); 0 = the line is not engraved.@,
+    angleDistance:number
+        @doc: 0 = an ordinary scale. Greater than 0: the values are ANGLES in degrees seen from a pivot that has this distance from the line (a speed square): the tick of the value v sits at angleDistance * (tan(v) - tan(valueStart)) from the origin, scaleLength must be the position of valueEnd. The ticks are radial to the pivot, not across the line.@,
+    angleOffset:number
+        @doc: Angle scale only: the angle seen from the pivot (measured from the perpendicular to the line) is the value plus angleOffset. 0 = the value is the angle from the perpendicular, so the value 0 sits at the foot of the pivot. Another offset moves the value 0 along the line, e.g. to the start of the scale.@
 )
 
 @doc: A circular scale on a circle around (centerX, centerY). The scale runs from startAngle to
@@ -245,11 +249,11 @@ Fractions are written down to this level: 0 = none, 1 = halves, 2 = also quarter
         @doc: ![](images/side_positive.png) ![](images/side_negative.png)
 
 Side of the scale line for ticks and labels: Positive = left of the direction, Negative = right.@,
-    skipFirstTick:boolean
+    skipFirstTick:number
         @doc: ![](images/skipFirstTick.png)
 
-Do not engrave the tick and its number at valueStart.@,
-    skipLastTick:boolean
+Number of ticks (with their numbers) left out at the start. 0 = none.@,
+    skipLastTick:number
         @doc: ![](images/skipLastTick.png)
 
 Do not engrave the tick and its number at valueEnd.@,
@@ -392,14 +396,14 @@ Gap in mm between the end of the major tick and the text. Default: 0.3 x labelHe
         @doc: ![](images/labelEvery.png)
 
 Label every n-th major tick. Default: 1 (every major tick).@
-    optional skipFirstLabel:boolean
+    optional skipFirstLabel:number
         @doc: ![](images/skipFirstLabel.png)
 
-No label at the first major tick (e.g. the 0 on the part edge). Default: false.@
-    optional skipLastLabel:boolean
+Number of labels left out at the start of the scale (e.g. 1 for the 0 on the part edge); the ticks stay. Default: 0.@
+    optional skipLastLabel:number
         @doc: ![](images/skipLastLabel.png)
 
-No label at the last major tick. Default: false.@
+Number of labels left out at the end of the scale; the ticks stay. Default: 0.@
     optional fractionDenominator:number
         @doc: ![](images/fractionDenominator.png)
 
@@ -421,10 +425,10 @@ No label at the last major tick. Default: false.@
         labelEvery = 1
     endif
     if not skipFirstLabel hasvalue
-        skipFirstLabel = false
+        skipFirstLabel = 0
     endif
     if not skipLastLabel hasvalue
-        skipLastLabel = false
+        skipLastLabel = 0
     endif
     if not fractionDenominator hasvalue
         fractionDenominator = 0
@@ -447,14 +451,14 @@ Value distance between two major ticks.@
         @doc: ![](images/minorDivisions.png)
 
 Minor intervals per major interval. Default: 10.@
-    optional skipFirstTick:boolean
+    optional skipFirstTick:number
         @doc: ![](images/skipFirstTick.png)
 
-Do not engrave the tick (and its label) at valueStart. Default: false.@
-    optional skipLastTick:boolean
+Number of ticks (with their labels) left out at the start of the range. Default: 0.@
+    optional skipLastTick:number
         @doc: ![](images/skipLastTick.png)
 
-Do not engrave the tick (and its label) at the end of the range. Default: false.@
+Number of ticks (with their labels) left out at the end of the range. Default: 0.@
     optional mediumEvery:number
         @doc: ![](images/mediumEvery.png)
 
@@ -464,10 +468,10 @@ Medium (intermediate) tick every n-th minor interval, e.g. 5 with minorDivisions
         minorDivisions = 10
     endif
     if not skipFirstTick hasvalue
-        skipFirstTick = false
+        skipFirstTick = 0
     endif
     if not skipLastTick hasvalue
-        skipLastTick = false
+        skipLastTick = 0
     endif
     if not mediumEvery hasvalue
         mediumEvery = 0
@@ -534,6 +538,10 @@ Side of the scale line for ticks and labels. Default: TickSide.Positive (left of
         @doc: ![](images/baselineDepth.png)
 
 Depth of the scale line in mm (positive = depth below the surface); 0 = not engraved. Default: 0.@
+    optional angleDistance:number
+        @doc: 0 = an ordinary scale (default). Greater than 0: the values are angles in degrees seen from a pivot at this distance from the line, like on a speed square. The tick of the value v sits at angleDistance * (tan(v + angleOffset) - tan(valueStart + angleOffset)); scaleLength must be the position of valueEnd, so that the baseline ends there.@
+    optional angleOffset:number
+        @doc: Angle scale only: the angle seen from the pivot (from the perpendicular to the line) is the value plus angleOffset. Default: 0.@
     ) returns LinearScale
     if not mediumTick hasvalue
         mediumTick = TickStyle = {(majorTick.tickLength + minorTick.tickLength) / 2, (majorTick.tickDepth + minorTick.tickDepth) / 2}
@@ -547,7 +555,13 @@ Depth of the scale line in mm (positive = depth below the surface); 0 = not engr
     if not baselineDepth hasvalue
         baselineDepth = 0
     endif
-    return LinearScale = {originX, originY, scaleLength, rotationAngle, division, side, majorTick, minorTick, mediumTick, labelFormat, baselineDepth}
+    if not angleDistance hasvalue
+        angleDistance = 0
+    endif
+    if not angleOffset hasvalue
+        angleOffset = 0
+    endif
+    return LinearScale = {originX, originY, scaleLength, rotationAngle, division, side, majorTick, minorTick, mediumTick, labelFormat, baselineDepth, angleDistance, angleOffset}
 endprogram
 
 @doc: Creates a circular scale (dial, protractor). By default it runs clockwise from 12 o'clock
@@ -659,7 +673,7 @@ endprogram
 
 @doc: Computes the ticks along the value range: position (fraction of the range), major or minor,
 and the label text. closeRing = true drops the tick at valueEnd (closed 360 degree circle). Ticks
-removed by skipFirstTick / skipLastTick are not part of the result. @
+removed by skipFirstTick / skipLastTick (a number of ticks) are not part of the result. @
 program BuildTicks (
     division:ScaleDivision
         @doc: Value range and tick spacing.@
@@ -693,10 +707,10 @@ program BuildTicks (
     endif
     for i from firstIndex to lastIndex
         skipTick = false
-        if i == firstIndex and division.skipFirstTick
+        if (i - firstIndex) < division.skipFirstTick
             skipTick = true
         endif
-        if i == lastIndex and division.skipLastTick
+        if (lastIndex - i) < division.skipLastTick
             skipTick = true
         endif
         if not skipTick
@@ -711,12 +725,6 @@ program BuildTicks (
             if isMajor
                 majorIndex = absIndex / minorCount
                 hasLabel = (majorIndex % labelEvery) == 0
-                if i == firstIndex and labelFormat.skipFirstLabel
-                    hasLabel = false
-                endif
-                if i == lastMajorIndex and labelFormat.skipLastLabel and not closeRing
-                    hasLabel = false
-                endif
             endif
             text = ""
             if hasLabel
@@ -737,6 +745,20 @@ endprogram
 function EstimateTextWidth (text:string, charWidth:number) returns number
     return Math::Max(1, String::StringLength(text)) * charWidth
 endfunction
+
+# Leaves out the first skipFirst and the last skipLast labels of a plan, counted in scale order. The ticks stay.
+program TrimLabels (labelList:ScaleLabel[] skipFirst:number skipLast:number) returns ScaleLabel[]
+    kept:ScaleLabel[] = {}
+    count = sizeof labelList
+    k = 0
+    foreach item in labelList
+        if k >= skipFirst and k < count - skipLast
+            append item to kept
+        endif
+        k = k + 1
+    endforeach
+    return kept
+endprogram
 
 @doc: Plans a linear scale: computes all tick lines, the optional baseline and the labels as data.
 No machine command is issued. Engrave the result with EngraveScalePlan, or draw it as a preview. @
@@ -761,6 +783,9 @@ export program PlanLinearScale (
 
     foreach tick in ticks
         u = tick.fraction * scale.scaleLength
+        if scale.angleDistance > 0
+            u = scale.angleDistance * (Math::TanDeg(tick.value + scale.angleOffset) - Math::TanDeg(scale.division.valueStart + scale.angleOffset))
+        endif
         px = scale.originX + u * ca
         py = scale.originY + u * sa
         style = scale.minorTick
@@ -770,16 +795,24 @@ export program PlanLinearScale (
         if tick.isMajor
             style = scale.majorTick
         endif
-        endX = px + tickDir * style.tickLength * nx
-        endY = py + tickDir * style.tickLength * ny
+        # direction of the tick: across the line, or radial to the pivot on an angle scale
+        tx = tickDir * nx
+        ty = tickDir * ny
+        if scale.angleDistance > 0
+            tx = Math::CosDeg(tick.value + scale.angleOffset) * tickDir * nx - Math::SinDeg(tick.value + scale.angleOffset) * ca
+            ty = Math::CosDeg(tick.value + scale.angleOffset) * tickDir * ny - Math::SinDeg(tick.value + scale.angleOffset) * sa
+        endif
+        endX = px + style.tickLength * tx
+        endY = py + style.tickLength * ty
         tickLine:ScaleLine = {px, py, endX, endY, style.tickDepth, tick.isMajor}
         append tickLine to lines
         if tick.hasLabel
-            dist = tickDir * (scale.majorTick.tickLength + scale.labelFormat.labelOffset + scale.labelFormat.labelHeight / 2)
-            labelItem:ScaleLabel = {tick.text, px + dist * nx, py + dist * ny, scale.rotationAngle, scale.labelFormat.labelHeight, scale.labelFormat.labelWidth, scale.labelFormat.labelDepth, LabelAlignment.Center}
+            dist = scale.majorTick.tickLength + scale.labelFormat.labelOffset + scale.labelFormat.labelHeight / 2
+            labelItem:ScaleLabel = {tick.text, px + dist * tx, py + dist * ty, scale.rotationAngle, scale.labelFormat.labelHeight, scale.labelFormat.labelWidth, scale.labelFormat.labelDepth, LabelAlignment.Center}
             append labelItem to labels
         endif
     endforeach
+    labels = TrimLabels(labelList=labels skipFirst=scale.labelFormat.skipFirstLabel skipLast=scale.labelFormat.skipLastLabel)
     return ScalePlan = {lines, arcs, labels}
 endprogram
 
@@ -859,6 +892,7 @@ export program PlanCircularScale (
             append labelItem to labels
         endif
     endforeach
+    labels = TrimLabels(labelList=labels skipFirst=scale.labelFormat.skipFirstLabel skipLast=scale.labelFormat.skipLastLabel)
     return ScalePlan = {lines, arcs, labels}
 endprogram
 
@@ -914,11 +948,11 @@ Direction of the scale in degrees, 0 = along +X. Default: 0.@
         @doc: ![](images/side_positive.png) ![](images/side_negative.png)
 
 Side of the scale line for ticks and labels. Default: TickSide.Positive.@
-    optional skipFirstTick:boolean
+    optional skipFirstTick:number
         @doc: ![](images/skipFirstTick.png)
 
 Do not engrave the tick and number at valueStart. Default: false.@
-    optional skipLastTick:boolean
+    optional skipLastTick:number
         @doc: ![](images/skipLastTick.png)
 
 Do not engrave the tick and number at valueEnd. Default: false.@
@@ -958,10 +992,10 @@ Depth of the scale line in mm (positive = depth below the surface); 0 = not engr
         side = TickSide.Positive
     endif
     if not skipFirstTick hasvalue
-        skipFirstTick = false
+        skipFirstTick = 0
     endif
     if not skipLastTick hasvalue
-        skipLastTick = false
+        skipLastTick = 0
     endif
     if not baselineDepth hasvalue
         baselineDepth = 0
@@ -999,10 +1033,10 @@ export program PlanFractionScale (
 
     for i from firstIndex to lastIndex
         skipTick = false
-        if i == firstIndex and scale.skipFirstTick
+        if (i - firstIndex) < scale.skipFirstTick
             skipTick = true
         endif
-        if i == lastIndex and scale.skipLastTick
+        if (lastIndex - i) < scale.skipLastTick
             skipTick = true
         endif
         if not skipTick
@@ -1030,12 +1064,6 @@ export program PlanFractionScale (
             if level == 0
                 unitIndex = Math::Abs(i) / perUnit
                 wanted = (unitIndex % unitEvery) == 0
-                if i == firstIndex and scale.unitLabel.skipFirstLabel
-                    wanted = false
-                endif
-                if i == lastIndex and scale.unitLabel.skipLastLabel
-                    wanted = false
-                endif
                 if wanted
                     labelText = ValueToString(Math::RoundDecimals(value, scale.unitLabel.decimals))
                 endif
@@ -1052,6 +1080,7 @@ export program PlanFractionScale (
             endif
         endif
     endfor
+    labels = TrimLabels(labelList=labels skipFirst=scale.unitLabel.skipFirstLabel skipLast=scale.unitLabel.skipLastLabel)
     return ScalePlan = {lines, arcs, labels}
 endprogram
 # ---------------------------------------------------------------------------------------

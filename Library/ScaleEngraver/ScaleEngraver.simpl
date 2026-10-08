@@ -29,6 +29,7 @@ using Base
 using ScaleEngraverCore
 import Math
 import AxisSystem
+import System
 import MillingCyclesUtilities
 
 @doc: The kind of ruler. Millimeter: ticks every 1 mm, a medium tick every 5 mm, a long tick with a number every
@@ -143,14 +144,22 @@ true = ticks and numbers on the right-hand side of the direction (below a ruler 
 Height of the numbers. Default: half the tick length, at least 2.5 mm.@
     optional numbers:boolean
         @doc: false = no numbers, only ticks. Default: true.@
-    optional skipFirst:boolean
+    optional skipFirst:number
+        @doc: ![](images/skipFirstLabel.png)
+
+Number of NUMBERS left out at the start; the ticks stay. 1 leaves out the first number, for example the 0 where the scale starts on the edge of the part. Default: 0.@
+    optional skipLast:number
+        @doc: ![](images/skipLastLabel.png)
+
+Number of numbers left out at the end; the ticks stay. Default: 0.@
+    optional skipFirstTicks:number
         @doc: ![](images/skipFirstTick.png)
 
-Leave out the first tick and its number, for example where the ruler starts on the edge of the part. Default: false.@
-    optional skipLast:boolean
+Number of TICKS left out at the start, together with their numbers - every tick counts, also the short ones. Default: 0.@
+    optional skipLastTicks:number
         @doc: ![](images/skipLastTick.png)
 
-Leave out the last tick and its number. Default: false.@
+Number of ticks left out at the end, together with their numbers. Default: 0.@
     optional baseline:boolean
         @doc: ![](images/baselineDepth.png)
 
@@ -201,10 +210,21 @@ Height above Z where the movement starts with the plunge feed. The tool gets the
         numbers = true
     endif
     if not skipFirst hasvalue
-        skipFirst = false
+        skipFirst = 0
     endif
     if not skipLast hasvalue
-        skipLast = false
+        skipLast = 0
+    endif
+    if not skipFirstTicks hasvalue
+        skipFirstTicks = 0
+    endif
+    if not skipLastTicks hasvalue
+        skipLastTicks = 0
+    endif
+    # numbers=false leaves out every number
+    numbersFirst = skipFirst
+    if not numbers
+        numbersFirst = 1000000
     endif
     if not baseline hasvalue
         baseline = true
@@ -259,11 +279,11 @@ Height above Z where the movement starts with the plunge feed. The tool gets the
             levelStyle:TickStyle = {tickLength * Math::Pow(factor, k), depth}
             append levelStyle to styles
         endfor
-        unitNumbers = NewLabelSettings(labelHeight=labelHeight labelDepth=depth labelEvery=labelEvery skipFirstLabel=not numbers)
+        unitNumbers = NewLabelSettings(labelHeight=labelHeight labelDepth=depth labelEvery=labelEvery skipFirstLabel=numbersFirst skipLastLabel=skipLast)
         if not numbers
             fractionLevel = 0
         endif
-        inchRuler = NewFractionScale(originX=X originY=Y scaleLength=length valueStart=valueStart valueEnd=valueEnd unitLabel=unitNumbers levels=levels tickStyles=styles fractionLabelLevel=fractionLevel rotationAngle=angle side=side skipFirstTick=skipFirst skipLastTick=skipLast baselineDepth=lineDepth)
+        inchRuler = NewFractionScale(originX=X originY=Y scaleLength=length valueStart=valueStart valueEnd=valueEnd unitLabel=unitNumbers levels=levels tickStyles=styles fractionLabelLevel=fractionLevel rotationAngle=angle side=side skipFirstTick=skipFirstTicks skipLastTick=skipLastTicks baselineDepth=lineDepth)
         MillingCyclesUtilities::ExecuteMillingCycle cycle=(EngraveFractionScale scale=inchRuler heights=heights)
     else
         if not majorStep hasvalue
@@ -283,11 +303,209 @@ Height above Z where the movement starts with the plunge feed. The tool gets the
         major = NewTickStyle(tickLength=tickLength tickDepth=depth)
         medium = NewTickStyle(tickLength=tickLength * factor tickDepth=depth)
         minor = NewTickStyle(tickLength=tickLength * factor * factor tickDepth=depth)
-        division = NewScaleDivision(valueStart=valueStart valueEnd=valueEnd majorStep=majorStep minorDivisions=minorParts mediumEvery=mediumAt skipFirstTick=skipFirst skipLastTick=skipLast)
-        numberStyle = NewLabelSettings(labelHeight=labelHeight labelDepth=depth labelEvery=labelEvery skipFirstLabel=not numbers)
+        division = NewScaleDivision(valueStart=valueStart valueEnd=valueEnd majorStep=majorStep minorDivisions=minorParts mediumEvery=mediumAt skipFirstTick=skipFirstTicks skipLastTick=skipLastTicks)
+        numberStyle = NewLabelSettings(labelHeight=labelHeight labelDepth=depth labelEvery=labelEvery skipFirstLabel=numbersFirst skipLastLabel=skipLast)
         ruler = NewLinearScale(originX=X originY=Y scaleLength=length division=division majorTick=major minorTick=minor mediumTick=medium labelFormat=numberStyle rotationAngle=angle side=side baselineDepth=lineDepth)
         MillingCyclesUtilities::ExecuteMillingCycle cycle=(EngraveLinearScale scale=ruler heights=heights)
     endif
+endprogram
+
+@doc: ![](images/header_EngraveAngleScale.png)
+
+Engraves an angle scale on a straight edge, like a speed square. You give the pivot (the corner of the square, nothing is
+engraved there) and the line of the scale: its start point (X, Y, Z) and either its end point (EndX, EndY) or its length and
+direction (length, angle). The angles are seen from the pivot: the ticks are placed by the angle as seen from the pivot, so they
+get farther apart the farther they are from the foot of the perpendicular from the pivot to the line (distance * tan).
+The numbers start at the start point with 0 (or with angleStart) and count the angle swept. Every tick is radial: it points
+to the pivot, like the rays of a protractor. A tick every degree, a longer one every 5, a number every 10 degrees.
+Example: EngraveAngleScale X=10 Y=70 Z=0 EndX=60 EndY=70 PivotX=10 PivotY=20 @
+export program EngraveAngleScale (
+    X:number
+        @doc: X of the start of the scale line.@
+    Y:number
+        @doc: Y of the start of the scale line.@
+    Z:number
+        @doc: ![](images/referenceZ.png)
+
+Z of the surface of the part at the scale. All depths are measured from this height.@
+    PivotX:number
+        @doc: ![](images/angleDistance.png)
+
+X of the pivot, the corner of the square the angles are measured from. Nothing is engraved at the pivot.@
+    PivotY:number
+        @doc: Y of the pivot.@
+    optional EndX:number
+        @doc: X of the end of the scale line. Give EndX and EndY, or length and angle.@
+    optional EndY:number
+        @doc: Y of the end of the scale line.@
+    optional length:number
+        @doc: ![](images/scaleLength.png)
+
+Length of the scale line, when no end point is given.@
+    optional angle:number
+        @doc: ![](images/rotationAngle.png)
+
+Direction of the scale line in degrees (0 = to the right, 90 = upwards), when no end point is given. Default: 0.@
+    optional angleStart:number
+        @doc: ![](images/startAngle.png)
+
+The angle value at the START point of the scale line. Default: 0, the scale counts from the start point, like a protractor whose zero is at the first tick. Another value, for example 30, makes the first tick show 30 and the numbers continue from there. The distances between the ticks do not change, they follow the geometry of the pivot. Set it to the true angle (the first tick seen from the perpendicular) to get a centred scale.@
+    optional majorStep:number
+        @doc: ![](images/majorStep.png)
+
+Angle between two long ticks (the ticks with a number). Default: 10 degrees.@
+    optional tickLength:number
+        @doc: ![](images/tickLength.png)
+
+Length of the longest tick. All other ticks are derived from it with the factor. Default: 6 mm.@
+    optional factor:number
+        @doc: ![](images/tickStyles.png)
+
+Every finer tick level is this much as long as the level before it. Default: 0.7.@
+    optional depth:number
+        @doc: ![](images/depth.png)
+
+Engraving depth of ticks, line and numbers, measured from Z (positive = how deep). Default: 0.1 mm.@
+    optional labelHeight:number
+        @doc: ![](images/labelHeight.png)
+
+Height of the numbers. Default: half the tick length, at least 2.5 mm.@
+    optional numbers:boolean
+        @doc: false = no numbers, only ticks. Default: true.@
+    optional skipFirst:number
+        @doc: ![](images/skipFirstLabel.png)
+
+Number of NUMBERS left out at the start; the ticks stay. 1 leaves out the first number, for example the 0 where the scale starts on the edge of the part. Default: 0.@
+    optional skipLast:number
+        @doc: ![](images/skipLastLabel.png)
+
+Number of numbers left out at the end; the ticks stay. Default: 0.@
+    optional skipFirstTicks:number
+        @doc: ![](images/skipFirstTick.png)
+
+Number of TICKS left out at the start, together with their numbers - every tick counts, also the short ones. Default: 0.@
+    optional skipLastTicks:number
+        @doc: ![](images/skipLastTick.png)
+
+Number of ticks left out at the end, together with their numbers. Default: 0.@
+    optional baseline:boolean
+        @doc: ![](images/baselineDepth.png)
+
+true = also engrave the line along the ticks. Default: true.@
+    optional infeedZ:number
+        @doc: ![](images/infeedZ.png)
+
+Maximum depth per cut. The depth divided by infeedZ gives the number of cuts; they alternate in direction without lifting the tool. Default: the depth (one cut).@
+    optional feedHeight:number
+        @doc: ![](images/feedHeight.png)
+
+Height above Z where the movement starts with the plunge feed. The tool gets there with PrePositioning, via the safe height set with SafeZHeightForWorkpiece. Default: 1 mm.@
+    )
+    mm = MillimetersPerUnit
+    if not majorStep hasvalue
+        majorStep = 10
+    endif
+    if not tickLength hasvalue
+        tickLength = 6 / mm
+    endif
+    if not factor hasvalue
+        factor = 0.7
+    endif
+    if not depth hasvalue
+        depth = 0.1 / mm
+    endif
+    if not labelHeight hasvalue
+        labelHeight = Math::Max(2.5, tickLength * mm * 0.5) / mm
+    endif
+    if not numbers hasvalue
+        numbers = true
+    endif
+    if not skipFirst hasvalue
+        skipFirst = 0
+    endif
+    if not skipLast hasvalue
+        skipLast = 0
+    endif
+    if not skipFirstTicks hasvalue
+        skipFirstTicks = 0
+    endif
+    if not skipLastTicks hasvalue
+        skipLastTicks = 0
+    endif
+    # numbers=false leaves out every number
+    numbersFirst = skipFirst
+    if not numbers
+        numbersFirst = 1000000
+    endif
+    if not baseline hasvalue
+        baseline = true
+    endif
+    if not infeedZ hasvalue
+        infeedZ = 0
+    endif
+    if not feedHeight hasvalue
+        feedHeight = 1 / mm
+    endif
+
+    # the scale line: from the start point to the end point, or over the length in the direction of angle
+    lineLength = 0
+    lineAngle = 0
+    if EndX hasvalue and EndY hasvalue
+        lineLength = Math::Sqrt((EndX - X) * (EndX - X) + (EndY - Y) * (EndY - Y))
+        lineAngle = Math::Atan2Deg(EndX - X, EndY - Y)
+    else
+        if not length hasvalue
+            System::RaiseError InvalidArgumentValue englishErrorDetails="EngraveAngleScale: give the end point (EndX and EndY) or the length of the scale line"
+        endif
+        if not angle hasvalue
+            angle = 0
+        endif
+        lineLength = length
+        lineAngle = angle
+    endif
+    dirX = Math::CosDeg(lineAngle)
+    dirY = Math::SinDeg(lineAngle)
+
+    # the pivot seen from the start of the line: along the line (where the foot of the perpendicular lies) and across it
+    alongPivot = (PivotX - X) * dirX + (PivotY - Y) * dirY
+    acrossPivot = dirX * (PivotY - Y) - dirY * (PivotX - X)
+    distance = Math::Abs(acrossPivot)
+    if distance < 0.000001
+        System::RaiseError InvalidArgumentValue englishErrorDetails="EngraveAngleScale: the pivot lies on the scale line, it needs a distance from it"
+    endif
+    # the true angles seen from the pivot (from the perpendicular to the line) at the start and at the end of the line
+    trueStart = Math::AtanDeg(-alongPivot / distance)
+    trueEnd = Math::AtanDeg((lineLength - alongPivot) / distance)
+    # the values shown: they start at angleStart at the start point (default 0) and run over the same angle
+    if not angleStart hasvalue
+        angleStart = 0
+    endif
+    angleEnd = angleStart + trueEnd - trueStart
+    angleOffset = trueStart - angleStart
+
+    # the ticks point towards the pivot: to the left of the direction when the pivot is on the left
+    side = TickSide.Negative
+    if acrossPivot > 0
+        side = TickSide.Positive
+    endif
+    lineDepth = 0
+    if baseline
+        lineDepth = depth
+    endif
+    labelEvery = 1
+    if not numbers
+        labelEvery = 1000000
+    endif
+
+    heights = NewEngraveHeights(referenceZ=Z feedHeight=feedHeight infeedZ=infeedZ)
+    # the long ticks and numbers every majorStep degrees, a tick every degree, a longer one every fifth
+    major = NewTickStyle(tickLength=tickLength tickDepth=depth)
+    medium = NewTickStyle(tickLength=tickLength * factor tickDepth=depth)
+    minor = NewTickStyle(tickLength=tickLength * factor * factor tickDepth=depth)
+    division = NewScaleDivision(valueStart=angleStart valueEnd=angleEnd majorStep=majorStep minorDivisions=majorStep mediumEvery=5 skipFirstTick=skipFirstTicks skipLastTick=skipLastTicks)
+    numberStyle = NewLabelSettings(labelHeight=labelHeight labelDepth=depth labelEvery=labelEvery skipFirstLabel=numbersFirst skipLastLabel=skipLast)
+    speedSquare = NewLinearScale(originX=X originY=Y scaleLength=lineLength division=division majorTick=major minorTick=minor mediumTick=medium labelFormat=numberStyle rotationAngle=lineAngle side=side baselineDepth=lineDepth angleDistance=distance angleOffset=angleOffset)
+    MillingCyclesUtilities::ExecuteMillingCycle cycle=(EngraveLinearScale scale=speedSquare heights=heights)
 endprogram
 
 @doc: ![](images/header_EngraveDial.png)
@@ -353,14 +571,22 @@ true = ticks and numbers inside the circle. Default: from the kind (only the pro
 
 How the numbers are turned: Tangential follows the circle, Radial runs along the radius, Horizontal is not turned.
 Default: from the kind.@
-    optional skipFirst:boolean
+    optional skipFirst:number
+        @doc: ![](images/skipFirstLabel.png)
+
+Number of NUMBERS left out at the start; the ticks stay. 1 leaves out the first number, for example the 0 where the scale starts on the edge of the part. Default: 0.@
+    optional skipLast:number
+        @doc: ![](images/skipLastLabel.png)
+
+Number of numbers left out at the end; the ticks stay. Default: 0.@
+    optional skipFirstTicks:number
         @doc: ![](images/skipFirstTick.png)
 
-Leave out the first tick and its number. Default: false.@
-    optional skipLast:boolean
+Number of TICKS left out at the start, together with their numbers - every tick counts, also the short ones. Default: 0.@
+    optional skipLastTicks:number
         @doc: ![](images/skipLastTick.png)
 
-Leave out the last tick and its number. Default: false.@
+Number of ticks left out at the end, together with their numbers. Default: 0.@
     optional baseline:boolean
         @doc: ![](images/baselineDepth.png)
 
@@ -464,10 +690,21 @@ Height above Z where the movement starts with the plunge feed. The tool gets the
         numbers = true
     endif
     if not skipFirst hasvalue
-        skipFirst = false
+        skipFirst = 0
     endif
     if not skipLast hasvalue
-        skipLast = false
+        skipLast = 0
+    endif
+    if not skipFirstTicks hasvalue
+        skipFirstTicks = 0
+    endif
+    if not skipLastTicks hasvalue
+        skipLastTicks = 0
+    endif
+    # numbers=false leaves out every number
+    numbersFirst = skipFirst
+    if not numbers
+        numbersFirst = 1000000
     endif
     if not baseline hasvalue
         baseline = true
@@ -503,8 +740,8 @@ Height above Z where the movement starts with the plunge feed. The tool gets the
     major = NewTickStyle(tickLength=tickLength tickDepth=depth)
     medium = NewTickStyle(tickLength=tickLength * factor tickDepth=depth)
     minor = NewTickStyle(tickLength=tickLength * factor * factor tickDepth=depth)
-    division = NewScaleDivision(valueStart=valueStart valueEnd=valueEnd majorStep=majorStep minorDivisions=kindMinor mediumEvery=kindMedium skipFirstTick=skipFirst skipLastTick=skipLast)
-    numberStyle = NewLabelSettings(labelHeight=labelHeight labelDepth=depth labelEvery=labelEvery skipFirstLabel=not numbers)
+    division = NewScaleDivision(valueStart=valueStart valueEnd=valueEnd majorStep=majorStep minorDivisions=kindMinor mediumEvery=kindMedium skipFirstTick=skipFirstTicks skipLastTick=skipLastTicks)
+    numberStyle = NewLabelSettings(labelHeight=labelHeight labelDepth=depth labelEvery=labelEvery skipFirstLabel=numbersFirst skipLastLabel=skipLast)
     dial = NewCircularScale(centerX=X centerY=Y radius=radius division=division majorTick=major minorTick=minor mediumTick=medium labelFormat=numberStyle startAngle=startAngle endAngle=endAngle side=side orientation=coreOrientation baselineDepth=lineDepth)
     MillingCyclesUtilities::ExecuteMillingCycle cycle=(EngraveCircularScale scale=dial heights=heights)
 endprogram

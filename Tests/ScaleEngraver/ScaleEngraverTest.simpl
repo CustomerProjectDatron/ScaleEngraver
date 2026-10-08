@@ -37,7 +37,7 @@ export program Main
     Expect condition=IsClose(actual=plan.labels[0].y expected=28.4) message="linear: label sits above the major tick"
 
     # Skipping labels on the borders
-    skipLabels = NewLabelSettings(labelHeight=3 skipFirstLabel=true skipLastLabel=true)
+    skipLabels = NewLabelSettings(labelHeight=3 skipFirstLabel=1 skipLastLabel=1)
     skipScale = NewLinearScale(originX=10 originY=20 scaleLength=100 division=division majorTick=majorTick minorTick=minorTick labelFormat=skipLabels)
     skipPlan = PlanLinearScale(scale=skipScale)
     Expect condition=(sizeof skipPlan.labels == 9) message="linear: first and last label skipped"
@@ -57,7 +57,7 @@ export program Main
 
 
     # Skipping the first and last tick removes the tick and its label
-    skipTickDivision = NewScaleDivision(valueStart=0 valueEnd=100 majorStep=10 minorDivisions=10 skipFirstTick=true skipLastTick=true)
+    skipTickDivision = NewScaleDivision(valueStart=0 valueEnd=100 majorStep=10 minorDivisions=10 skipFirstTick=1 skipLastTick=1)
     skipTickScale = NewLinearScale(originX=0 originY=0 scaleLength=100 division=skipTickDivision majorTick=majorTick minorTick=minorTick labelFormat=labels)
     skipTickPlan = PlanLinearScale(scale=skipTickScale)
     Expect condition=(sizeof skipTickPlan.lines == 99) message="linear: first and last tick skipped"
@@ -91,7 +91,7 @@ export program Main
     Expect condition=(eighthsPlan.labels[12].text == "1 1/2") message="fraction: mixed number"
 
     # Fraction scale (inch ruler): 0..2 inch, halved 3 times (eighths), fractions labelled down to the quarters
-    unitLabels = NewLabelSettings(labelHeight=3 skipFirstLabel=true)
+    unitLabels = NewLabelSettings(labelHeight=3 skipFirstLabel=1)
     fraction = NewFractionScale(originX=0 originY=0 scaleLength=200 valueStart=0 valueEnd=2 unitLabel=unitLabels levels=3 tickLength=8 tickDepth=0.2 fractionLabelLevel=2)
     fractionRuler = PlanFractionScale(scale=fraction)
     Expect condition=(sizeof fractionRuler.lines == 17) message="fraction scale: 2 inch in eighths = 17 ticks"
@@ -125,6 +125,16 @@ export program Main
     partialPlan = PlanCircularScale(scale=partial)
     Expect condition=(sizeof partialPlan.lines == 31) message="circular: partial arc keeps both end ticks"
 
+
+    TestOwnScales
+endprogram
+
+# Own value ranges, the clock face, the angle scale and the skip counts
+program TestOwnScales
+    majorTick = NewTickStyle(tickLength=6 tickDepth=0.2)
+    minorTick = NewTickStyle(tickLength=3 tickDepth=0.1)
+    labels = NewLabelSettings(labelHeight=3)
+
     # Own value range: ticks sit on multiples of the step, the first tick is the first one inside the range
     rangeDivision = NewScaleDivision(valueStart=15 valueEnd=85 majorStep=10 minorDivisions=10)
     rangeScale = NewLinearScale(originX=0 originY=0 scaleLength=70 division=rangeDivision majorTick=majorTick minorTick=minorTick labelFormat=labels)
@@ -151,6 +161,51 @@ export program Main
     Expect condition=(clockPlan.labels[11].text == "12") message="clock: last number is 12"
     Expect condition=IsClose(actual=clockPlan.lines[55].x1 expected=0) message="clock: 12 is at 12 o'clock (x)"
     Expect condition=IsClose(actual=clockPlan.lines[55].y1 expected=40) message="clock: 12 is at 12 o'clock (y)"
+
+    # Angle scale on a straight (speed square): the tick of the angle a sits at distance * tan(a)
+    angleDivision = NewScaleDivision(valueStart=0 valueEnd=45 majorStep=10 minorDivisions=10 mediumEvery=5)
+    angleScale = NewLinearScale(originX=0 originY=0 scaleLength=100 division=angleDivision majorTick=majorTick minorTick=minorTick labelFormat=labels angleDistance=100)
+    anglePlan = PlanLinearScale(scale=angleScale)
+    Expect condition=(sizeof anglePlan.lines == 46) message="angle scale: a tick every degree from 0 to 45"
+    Expect condition=IsClose(actual=anglePlan.lines[10].x1 expected=17.6327) message="angle scale: 10 degrees at 100 * tan(10)"
+    Expect condition=IsClose(actual=anglePlan.lines[45].x1 expected=100) message="angle scale: 45 degrees at the distance"
+    Expect condition=IsClose(actual=anglePlan.lines[45].x2 expected=100 - 4.5 * 0.70710678) message="angle scale: the 45 degree tick points to the pivot (x)"
+    Expect condition=IsClose(actual=anglePlan.lines[45].y2 expected=4.5 * 0.70710678) message="angle scale: the 45 degree tick points to the pivot (y)"
+    Expect condition=IsClose(actual=anglePlan.lines[0].x2 expected=0) message="angle scale: the 0 degree tick is across the line"
+    Expect condition=(sizeof anglePlan.labels == 5) message="angle scale: numbers 0 10 20 30 40"
+    Expect condition=(anglePlan.labels[2].text == "20") message="angle scale: third number is 20"
+    shiftedDivision = NewScaleDivision(valueStart=15 valueEnd=60 majorStep=5 minorDivisions=5)
+    shiftedScale = NewLinearScale(originX=10 originY=0 scaleLength=44.6 division=shiftedDivision majorTick=majorTick minorTick=minorTick labelFormat=labels angleDistance=60)
+    shiftedPlan = PlanLinearScale(scale=shiftedScale)
+    Expect condition=IsClose(actual=shiftedPlan.lines[0].x1 expected=10) message="angle scale: the first tick sits at the origin"
+    Expect condition=IsClose(actual=shiftedPlan.lines[45].x1 expected=10 + 60 * (1.7320508 - 0.2679492)) message="angle scale: 60 degrees relative to 15 degrees"
+    # Angle scale with an offset: the values count from the start point, the geometry keeps the true angles
+    offsetDivision = NewScaleDivision(valueStart=0 valueEnd=30 majorStep=10 minorDivisions=10)
+    offsetScale = NewLinearScale(originX=0 originY=0 scaleLength=100 division=offsetDivision majorTick=majorTick minorTick=minorTick labelFormat=labels angleDistance=100 angleOffset=20)
+    offsetPlan = PlanLinearScale(scale=offsetScale)
+    Expect condition=IsClose(actual=offsetPlan.lines[0].x1 expected=0) message="angle offset: the first tick sits at the origin"
+    Expect condition=IsClose(actual=offsetPlan.lines[10].x1 expected=100 * (0.57735027 - 0.36397023)) message="angle offset: value 10 is the true angle 30"
+    Expect condition=IsClose(actual=offsetPlan.lines[0].x2 expected=-6 * 0.34202014) message="angle offset: the first tick leans by the true angle 20"
+    # Leaving out several ticks at the start and at the end
+    manyDivision = NewScaleDivision(valueStart=0 valueEnd=100 majorStep=10 minorDivisions=10 skipFirstTick=3 skipLastTick=2)
+    manyScale = NewLinearScale(originX=0 originY=0 scaleLength=100 division=manyDivision majorTick=majorTick minorTick=minorTick labelFormat=labels)
+    manyPlan = PlanLinearScale(scale=manyScale)
+    Expect condition=(sizeof manyPlan.lines == 96) message="skip: 101 ticks minus 3 at the start and 2 at the end"
+    Expect condition=IsClose(actual=manyPlan.lines[0].x1 expected=3) message="skip: the first tick left is at 3"
+    Expect condition=IsClose(actual=manyPlan.lines[95].x1 expected=98) message="skip: the last tick left is at 98"
+    manyLabelCount = sizeof manyPlan.labels
+    Expect condition=(manyLabelCount == 9) message="skip: nine numbers stay"
+    # Leaving out several numbers: the ticks stay
+    fewLabels = NewLabelSettings(labelHeight=3 skipFirstLabel=2 skipLastLabel=3)
+    fewDivision = NewScaleDivision(valueStart=0 valueEnd=100 majorStep=10 minorDivisions=10)
+    fewScale = NewLinearScale(originX=0 originY=0 scaleLength=100 division=fewDivision majorTick=majorTick minorTick=minorTick labelFormat=fewLabels)
+    fewPlan = PlanLinearScale(scale=fewScale)
+    fewTickCount = sizeof fewPlan.lines
+    fewLabelCount = sizeof fewPlan.labels
+    Expect condition=(fewTickCount == 101) message="skip numbers: all ticks stay"
+    Expect condition=(fewLabelCount == 6) message="skip numbers: 11 numbers minus 2 at the start and 3 at the end"
+    Expect condition=(fewPlan.labels[0].text == "20") message="skip numbers: the first number left is 20"
+    Expect condition=(fewPlan.labels[5].text == "70") message="skip numbers: the last number left is 70"
 endprogram
 
 end
