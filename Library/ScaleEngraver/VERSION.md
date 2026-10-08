@@ -1,3 +1,10 @@
+# ScaleEngraver v1.2.0
+
+- `EngraveAngleScale` for angle scales on a straight edge (speed square): pivot, start and end point; ticks radial to the pivot
+- `skipFirst` / `skipLast` leave out numbers, `skipFirstTicks` / `skipLastTicks` leave out ticks
+- Sample `SampleSpeedSquare`: four scales on one plate, then the 45 degree edge milled with tool radius compensation
+- Top view of the simulated speed square in the README and the store description; library visible to the user
+
 # ScaleEngraver v1.1.0
 
 One command per scale, heights and feeds like the DATRON milling cycles.
