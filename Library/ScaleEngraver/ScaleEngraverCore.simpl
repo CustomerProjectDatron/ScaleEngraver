@@ -1130,7 +1130,7 @@ program CutArc (
     endfor
 endprogram
 
-@doc: Engraves one label with Engrave::StandardTextEngrave. The command counts from the position it starts at, and that position is the rapid level strokeRapidZ ABOVE the surface (like a drilling cycle that starts at its safe distance). So the label is started with PrePositioning to referenceZ + strokeRapidZ, with strokeRapidZ = twice the feed height. The command also counts downwards: depth is positive into the material, and strokeCuttingZ is measured like the depth (the final cut is at -(strokeCuttingZ + depth) below the surface, observed on the control). To start the feed move at the feed height ABOVE the surface and still end at textDepth below it, the label is engraved with strokeCuttingZ = -feedHeight and depth = textDepth + feedHeight. @
+@doc: Engraves one label with Engrave::StandardTextEngrave. The command counts from the position it starts at, and that position is the rapid level strokeRapidZ ABOVE the surface (like a drilling cycle that starts at its safe distance). So the label is started with PrePositioning to referenceZ + strokeRapidZ, with strokeRapidZ = twice the feed height. The command also counts downwards: depth is positive into the material, and strokeCuttingZ is measured like the depth (the final cut is at -(strokeCuttingZ + depth) below the surface, observed on the control). To start the feed move at the feed height ABOVE the surface and still end at textDepth below it, the label is engraved with strokeCuttingZ = -feedHeight and depth = textDepth + feedHeight. The command has no infeedZ: when the depth is larger than infeedZ the label is engraved several times, each time deeper (strokeCuttingZ = previous depth - feedHeight, depth = step + feedHeight). @
 program CutLabel (
     item:ScaleLabel
         @doc: The label to engrave.@
@@ -1145,8 +1145,16 @@ program CutLabel (
         alignment = HorizontalAlignment.Right
     endif
     rapidLevel = 2 * heights.feedHeight
-    PrePositioning X=item.x Y=item.y Z=heights.referenceZ + rapidLevel
-    StandardTextEngrave text=item.text charHeight=item.textHeight charWidth=item.textWidth depth=item.textDepth + heights.feedHeight strokeRapidZ=rapidLevel strokeCuttingZ=-heights.feedHeight rotation=item.rotation textPosition=alignment
+    # StandardTextEngrave has no infeed of its own: a deep text is engraved several times, each time deeper
+    stepZ = InfeedStep(depth=item.textDepth infeedZ=heights.infeedZ)
+    passes = Math::Ceiling(item.textDepth / stepZ - 0.000001)
+    for k from 1 to passes
+        previousZ = (k - 1) * stepZ
+        targetZ = Math::Min(item.textDepth, k * stepZ)
+        PrePositioning X=item.x Y=item.y Z=heights.referenceZ + rapidLevel
+        # the plunge feed starts feedHeight above the bottom of the previous cut and ends at the target depth
+        StandardTextEngrave text=item.text charHeight=item.textHeight charWidth=item.textWidth depth=targetZ - previousZ + heights.feedHeight strokeRapidZ=rapidLevel strokeCuttingZ=previousZ - heights.feedHeight rotation=item.rotation textPosition=alignment
+    endfor
 endprogram
 
 @doc: Engraves a plan: baseline arcs, then all tick lines in scale order, then the labels.

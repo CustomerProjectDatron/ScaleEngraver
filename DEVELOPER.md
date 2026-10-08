@@ -50,7 +50,7 @@ Text is engraved with `StandardTextEngrave`. It counts from the position it star
 level (`strokeRapidZ`) above the surface, so a label is positioned at `Z + strokeRapidZ` first (observed: starting at `Z` = 10 the
 text ended 2.1 mm deep instead of 0.1, exactly `strokeRapidZ` too deep). `strokeRapidZ` is twice the feed height. The command takes a
 positive `depth`, and `strokeCuttingZ` counts like the depth (final cut at `-(strokeCuttingZ + depth)` below the surface), so the library
-passes `strokeCuttingZ = -feedHeight` and `depth = textDepth + feedHeight`.
+passes `strokeCuttingZ = -feedHeight` and `depth = textDepth + feedHeight`. `StandardTextEngrave` has no `infeedZ`, so a text deeper than `infeedZ` is engraved several times, each pass starting `feedHeight` above the bottom of the previous one (`strokeCuttingZ = previousDepth - feedHeight`, `depth = step + feedHeight`).
 
 ## Parameters (core structures)
 
