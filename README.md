@@ -91,6 +91,7 @@ Every sample is only a few lines and commented; copy the one that is closest to 
 | `SampleInchRuler` | an inch ruler (inch, 1/2, 1/4, 1/8, 1/16), programmed completely in inch |
 | `SampleProtractor` | a half circle 0 to 180 degrees, ticks and numbers inside |
 | `SampleGauge` | a 270 degree gauge 0 to 100 |
+| `SampleClock` | a clock face: 12 hour numbers and 60 minute ticks inside the circle |
 | `SampleCustomScale` | your own scales: a ruler from 20 to 70, one from -50 to 50, a gauge from 20 to 80 |
 | `SampleEdgeRuler` | a vertical centimetre ruler along a part edge; the tick on the edge is left out |
 | `SampleDialVariants` | three dials: numbers following the circle, along the radius, horizontal |

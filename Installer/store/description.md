@@ -26,7 +26,7 @@ program, copy one of the commented samples.
 ## What it can do
 
 - Engrave millimetre and centimetre rulers, and real inch rulers (inch, 1/2, 1/4, 1/8, 1/16 with fractions)
-- Engrave dials: degrees, percent, gauges with a partial sweep and protractors
+- Engrave dials: degrees, percent, gauges with a partial sweep, protractors and clock faces
 - Straight scales in any direction, ticks on either side; circular scales over any part of the circle
 - Define one tick length: every finer tick level is a fixed fraction of it (factor 0.7 by default), and the numbers follow
 - Defaults for ticks, numbers, depth and heights in millimetres, converted automatically when the control is set to inch
@@ -51,4 +51,4 @@ program, copy one of the commented samples.
 
 - Library `ScaleEngraver` - the commands `EngraveRuler` and `EngraveDial`
 - Sample `ScaleEngraverApp` - asks for the scale in two dialogs and engraves it
-- Samples `ScaleEngraverSample`, `SampleInchRuler`, `SampleProtractor`, `SampleGauge`, `SampleCustomScale`, `SampleEdgeRuler`, `SampleDialVariants` - short commented examples to copy from
+- Samples `ScaleEngraverSample`, `SampleInchRuler`, `SampleProtractor`, `SampleGauge`, `SampleClock`, `SampleCustomScale`, `SampleEdgeRuler`, `SampleDialVariants` - short commented examples to copy from
