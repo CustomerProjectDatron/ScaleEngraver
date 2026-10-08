@@ -140,6 +140,17 @@ export program Main
     Expect condition=(negativePlan.labels[0].text == "-50") message="range: first number is -50"
     Expect condition=(negativePlan.labels[5].text == "0") message="range: zero in the middle"
     Expect condition=IsClose(actual=negativePlan.labels[5].x expected=50) message="range: zero sits in the middle"
+
+    # Clock face: values 1 to 13 over a full turn, the tick at 13 is the one at 1 and is not engraved twice
+    clockDivision = NewScaleDivision(valueStart=1 valueEnd=13 majorStep=1 minorDivisions=5)
+    clock = NewCircularScale(centerX=0 centerY=0 radius=40 division=clockDivision majorTick=majorTick minorTick=minorTick labelFormat=labels startAngle=60 endAngle=-300)
+    clockPlan = PlanCircularScale(scale=clock)
+    Expect condition=(sizeof clockPlan.lines == 60) message="clock: 60 minute ticks"
+    Expect condition=(sizeof clockPlan.labels == 12) message="clock: 12 hour numbers"
+    Expect condition=(clockPlan.labels[0].text == "1") message="clock: first number is 1"
+    Expect condition=(clockPlan.labels[11].text == "12") message="clock: last number is 12"
+    Expect condition=IsClose(actual=clockPlan.lines[55].x1 expected=0) message="clock: 12 is at 12 o'clock (x)"
+    Expect condition=IsClose(actual=clockPlan.lines[55].y1 expected=40) message="clock: 12 is at 12 o'clock (y)"
 endprogram
 
 end

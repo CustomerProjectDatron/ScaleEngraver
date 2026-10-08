@@ -1,0 +1,38 @@
+﻿module SampleClock
+
+@ Author = "Benjamin Boeck" @
+@ MeasuringSystem = "Metric" @
+@ WorkpieceGeometry :"MinEdge":{"X":0.0,"Y":0.0,"Z":-10.0},"MaxEdge":{"X":100.0,"Y":100.0,"Z":0.0}@
+
+# SAMPLE: the dial of a clock - 12 hour numbers and 60 minute ticks, ticks and numbers inside the circle.
+#
+#   EngraveDial X=50 Y=50 Z=0 radius=40 kind=DialKind.Percent valueStart=1 valueEnd=13 majorStep=1 startAngle=60 inside=true orientation=NumberOrientation.Horizontal
+#
+# How the clock is made from the dial:
+#   valueStart=1 valueEnd=13   the numbers run 1 ... 12; the tick at 13 is the one at 1 again and is not engraved twice
+#   majorStep=1                one long tick with a number per hour
+#   kind=DialKind.Percent      five short ticks between two hours: 12 hours x 5 = 60 minute ticks
+#   startAngle=60              the value 1 sits at 1 o'clock (0 = right, 90 = 12 o'clock); the dial runs clockwise
+#   inside=true                ticks and numbers inside the circle
+#   orientation=Horizontal     upright numbers; Tangential would turn them along the circle
+# Make the hour ticks longer with tickLength=8, or leave the numbers out with numbers=false.
+#
+# The program sets the retract height (SafeZHeightForWorkpiece), the feeds and the spindle.
+
+using Base
+using ScaleEngraver
+
+export program Main
+    Absolute
+    SafeZHeightForWorkpiece = 15
+    Rpm = 13000
+    SetFeedTechnology plunge=200 finishing=800
+    Spindle On
+
+    EngraveDial X=50 Y=50 Z=0 radius=40 kind=DialKind.Percent valueStart=1 valueEnd=13 majorStep=1 startAngle=60 inside=true orientation=NumberOrientation.Horizontal
+
+    Spindle Off
+    MoveToParkPosition
+endprogram
+
+end
