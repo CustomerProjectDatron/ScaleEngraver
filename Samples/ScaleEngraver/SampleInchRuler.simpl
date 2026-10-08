@@ -24,7 +24,7 @@
 #     fractionLevel=1     numbers only for the halves (0 = no fractions, 3 = also eighths)
 #     tickLength=0.3      a longer longest tick; everything else follows
 #
-# The program selects the tool and sets Rpm, the feeds and the spindle. Z = 0 is the surface of the part.
+# The program selects the tool and sets Rpm and the feeds; the spindle is handled by the commands. Z = 0 is the surface of the part.
 
 using Base
 using ScaleEngraver
@@ -36,11 +36,9 @@ export program Main
     SafeZHeightForWorkpiece = 0.6
     Rpm = 13000
     SetFeedTechnology plunge=8 finishing=30
-    Spindle On
 
     EngraveRuler X=0.4 Y=0.4 Z=0 length=6
 
-    Spindle Off
     AxisSystem::MetricMeasuring
     MoveToParkPosition
 endprogram

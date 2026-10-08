@@ -20,7 +20,7 @@
 #   infeedZ       depth    maximum depth per cut (one cut by default)
 #
 # The calling program selects the tool, sets Rpm, the feeds (SetFeedTechnology plunge= finishing=), the retract height
-# (SafeZHeightForWorkpiece) and Spindle On/Off. X, Y and Z give the position like in the Line command; Z is the height of
+# (SafeZHeightForWorkpiece). The commands run as milling cycles (MillingCyclesUtilities::ExecuteMillingCycle), which takes care of the spindle. X, Y and Z give the position like in the Line command; Z is the height of
 # the surface, the depth is measured from it. Every engraving starts with PrePositioning: up to the safe height, over the
 # start, down to the feed height.
 # The engine (parameter structures, geometry as data) is the module ScaleEngraverCore.
@@ -29,6 +29,7 @@ using Base
 using ScaleEngraverCore
 import Math
 import AxisSystem
+import MillingCyclesUtilities
 
 @doc: The kind of ruler. Millimeter: ticks every 1 mm, a medium tick every 5 mm, a long tick with a number every
 10 mm (the numbers are millimetres). Centimeter: the same ticks, the numbers are centimetres (1, 2, 3 ...).
@@ -263,7 +264,7 @@ Height above Z where the movement starts with the plunge feed. The tool gets the
             fractionLevel = 0
         endif
         inchRuler = NewFractionScale(originX=X originY=Y scaleLength=length valueStart=valueStart valueEnd=valueEnd unitLabel=unitNumbers levels=levels tickStyles=styles fractionLabelLevel=fractionLevel rotationAngle=angle side=side skipFirstTick=skipFirst skipLastTick=skipLast baselineDepth=lineDepth)
-        EngraveFractionScale scale=inchRuler heights=heights
+        MillingCyclesUtilities::ExecuteMillingCycle cycle=(EngraveFractionScale scale=inchRuler heights=heights)
     else
         if not majorStep hasvalue
             majorStep = 10
@@ -285,7 +286,7 @@ Height above Z where the movement starts with the plunge feed. The tool gets the
         division = NewScaleDivision(valueStart=valueStart valueEnd=valueEnd majorStep=majorStep minorDivisions=minorParts mediumEvery=mediumAt skipFirstTick=skipFirst skipLastTick=skipLast)
         numberStyle = NewLabelSettings(labelHeight=labelHeight labelDepth=depth labelEvery=labelEvery skipFirstLabel=not numbers)
         ruler = NewLinearScale(originX=X originY=Y scaleLength=length division=division majorTick=major minorTick=minor mediumTick=medium labelFormat=numberStyle rotationAngle=angle side=side baselineDepth=lineDepth)
-        EngraveLinearScale scale=ruler heights=heights
+        MillingCyclesUtilities::ExecuteMillingCycle cycle=(EngraveLinearScale scale=ruler heights=heights)
     endif
 endprogram
 
@@ -505,7 +506,7 @@ Height above Z where the movement starts with the plunge feed. The tool gets the
     division = NewScaleDivision(valueStart=valueStart valueEnd=valueEnd majorStep=majorStep minorDivisions=kindMinor mediumEvery=kindMedium skipFirstTick=skipFirst skipLastTick=skipLast)
     numberStyle = NewLabelSettings(labelHeight=labelHeight labelDepth=depth labelEvery=labelEvery skipFirstLabel=not numbers)
     dial = NewCircularScale(centerX=X centerY=Y radius=radius division=division majorTick=major minorTick=minor mediumTick=medium labelFormat=numberStyle startAngle=startAngle endAngle=endAngle side=side orientation=coreOrientation baselineDepth=lineDepth)
-    EngraveCircularScale scale=dial heights=heights
+    MillingCyclesUtilities::ExecuteMillingCycle cycle=(EngraveCircularScale scale=dial heights=heights)
 endprogram
 
 end

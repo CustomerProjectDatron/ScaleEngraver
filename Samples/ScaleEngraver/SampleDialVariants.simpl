@@ -15,7 +15,7 @@
 # kind=DialKind.Percent is a full circle 0..100 with a long tick and a number every 10. The tick length
 # of a dial defaults to 20 percent of the radius (at most 6 mm), here 4 mm.
 #
-# The program selects the tool and sets Rpm, the feeds and the spindle. Z = 0 is the surface of the part.
+# The program selects the tool and sets Rpm and the feeds; the spindle is handled by the commands. Z = 0 is the surface of the part.
 
 using Base
 using ScaleEngraver
@@ -25,13 +25,11 @@ export program Main
     SafeZHeightForWorkpiece = 15
     Rpm = 13000
     SetFeedTechnology plunge=200 finishing=800
-    Spindle On
 
     EngraveDial X=30 Y=30 Z=0 radius=20 kind=DialKind.Percent orientation=NumberOrientation.Tangential
     EngraveDial X=90 Y=30 Z=0 radius=20 kind=DialKind.Percent orientation=NumberOrientation.Radial
     EngraveDial X=150 Y=30 Z=0 radius=20 kind=DialKind.Percent orientation=NumberOrientation.Horizontal
 
-    Spindle Off
     MoveToParkPosition
 endprogram
 

@@ -14,7 +14,7 @@
 #   valueStart=20 valueEnd=80     your own scale: the same sweep shows 20 to 80
 # and the sweep with startAngle= / endAngle= (an end angle smaller than the start angle runs clockwise).
 #
-# The program selects the tool and sets Rpm, the feeds and the spindle. Z = 0 is the surface of the part.
+# The program selects the tool and sets Rpm and the feeds; the spindle is handled by the commands. Z = 0 is the surface of the part.
 
 using Base
 using ScaleEngraver
@@ -24,11 +24,9 @@ export program Main
     SafeZHeightForWorkpiece = 15
     Rpm = 13000
     SetFeedTechnology plunge=200 finishing=800
-    Spindle On
 
     EngraveDial X=50 Y=50 Z=0 radius=30 kind=DialKind.Gauge
 
-    Spindle Off
     MoveToParkPosition
 endprogram
 

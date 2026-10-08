@@ -35,7 +35,7 @@ Not part of the package (the package only contains `Library/`, `Samples/` and `T
   value can be overridden.
 * **Core** (module `ScaleEngraverCore`): parameter structures, `Plan...Scale` returns a `ScalePlan`
   (lines, arcs, labels as data), `EngraveScalePlan` turns it into motion. Pure motion: the **calling
-  program** selects the tool and sets `Rpm`, `SafeZHeightForWorkpiece`, `SetFeedTechnology plunge= finishing=` and `Spindle On/Off`. The plan layer is kept for
+  program** selects the tool and sets `Rpm`, `SafeZHeightForWorkpiece`, `SetFeedTechnology plunge= finishing=`; `EngraveRuler`/`EngraveDial` run their motion inside `MillingCyclesUtilities::ExecuteMillingCycle`, which handles the spindle (and the machine state), so the samples have no `Spindle On/Off`. The plan layer is kept for
   the tests and for a later preview / web API; it is not part of the user surface.
 ### Move sequence
 

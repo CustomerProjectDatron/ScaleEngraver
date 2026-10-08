@@ -14,7 +14,7 @@
 #                     part side (+X) of the edge X = 0; the default is the left-hand side
 #   skipFirst=true    no tick and no number at 0, directly on the edge of the part
 #
-# The program selects the tool and sets Rpm, the feeds and the spindle. Z = 0 is the surface of the part.
+# The program selects the tool and sets Rpm and the feeds; the spindle is handled by the commands. Z = 0 is the surface of the part.
 
 using Base
 using ScaleEngraver
@@ -24,11 +24,9 @@ export program Main
     SafeZHeightForWorkpiece = 15
     Rpm = 13000
     SetFeedTechnology plunge=200 finishing=800
-    Spindle On
 
     EngraveRuler X=0 Y=20 Z=0 length=100 kind=ScaleKind.Centimeter angle=90 below=true skipFirst=true
 
-    Spindle Off
     MoveToParkPosition
 endprogram
 

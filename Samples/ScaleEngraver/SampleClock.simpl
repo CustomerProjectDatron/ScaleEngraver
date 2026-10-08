@@ -17,7 +17,7 @@
 #   orientation=Horizontal     upright numbers; Tangential would turn them along the circle
 # Make the hour ticks longer with tickLength=8, or leave the numbers out with numbers=false.
 #
-# The program sets the retract height (SafeZHeightForWorkpiece), the feeds and the spindle.
+# The program sets the retract height (SafeZHeightForWorkpiece), Rpm and the feeds; the spindle is handled by the commands.
 
 using Base
 using ScaleEngraver
@@ -27,11 +27,20 @@ export program Main
     SafeZHeightForWorkpiece = 15
     Rpm = 13000
     SetFeedTechnology plunge=200 finishing=800
-    Spindle On
 
-    EngraveDial X=50 Y=50 Z=0 radius=40 kind=DialKind.Percent valueStart=1 valueEnd=13 majorStep=1 startAngle=60 inside=true orientation=NumberOrientation.Horizontal
+    EngraveDial(
+        X=50
+        Y=50
+        Z=0
+        radius=40
+        valueStart=1
+        valueEnd=13
+        majorStep=1
+        startAngle=60
+        inside=true
+        orientation=NumberOrientation.Horizontal
+    )
 
-    Spindle Off
     MoveToParkPosition
 endprogram
 

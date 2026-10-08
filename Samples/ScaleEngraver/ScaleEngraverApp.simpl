@@ -55,7 +55,6 @@ export program Main
         SafeZHeightForWorkpiece = 15
         Rpm = rpmValue
         SetFeedTechnology plunge=plungeValue finishing=feedValue
-        Spindle On
         EngraveRuler X=rulerInputs[0].NumberValue Y=rulerInputs[1].NumberValue Z=0 length=rulerInputs[2].NumberValue kind=chosenRuler angle=rulerInputs[3].NumberValue tickLength=rulerInputs[4].NumberValue depth=rulerInputs[5].NumberValue below=rulerInputs[6].BooleanValue skipFirst=rulerInputs[7].BooleanValue
     else
         dialInputs:InputParameter[] = {
@@ -84,10 +83,8 @@ export program Main
         SafeZHeightForWorkpiece = 15
         Rpm = rpmValue
         SetFeedTechnology plunge=plungeValue finishing=feedValue
-        Spindle On
         EngraveDial X=dialInputs[0].NumberValue Y=dialInputs[1].NumberValue Z=0 radius=dialInputs[2].NumberValue kind=chosenDial tickLength=dialInputs[3].NumberValue depth=dialInputs[4].NumberValue skipFirst=dialInputs[5].BooleanValue
     endif
-    Spindle Off
     MoveToParkPosition
 endprogram
 

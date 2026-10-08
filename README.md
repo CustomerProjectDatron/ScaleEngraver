@@ -53,7 +53,7 @@ Both commands also take the settings below.
 | `infeedZ` | maximum depth per cut; the depth divided by it gives the number of cuts, which alternate in direction without lifting | the depth (one cut) |
 
 The defaults are given in millimetres and are converted by themselves when the control is set to inch.
-Select the tool and set `Rpm` and `Spindle On` in your program before the command, plus the retract height and the feeds like for the DATRON cycles:
+Select the tool and set `Rpm` in your program before the command, plus the retract height and the feeds like for the DATRON cycles. The command itself takes care of the spindle (it runs as a milling cycle):
 
 ```
 SafeZHeightForWorkpiece = 15

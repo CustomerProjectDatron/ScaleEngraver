@@ -13,8 +13,8 @@
 # from the left (0) to the right (180), ticks and numbers inside the circle, numbers not turned.
 # Every one of these can be overridden, for example  inside=false  puts the ticks outside.
 #
-# The bottom line of the protractor is not part of the scale. The program selects the tool and sets Rpm,
-# the feeds and the spindle. Z = 0 is the surface of the part.
+# The bottom line of the protractor is not part of the scale. The program selects the tool and sets Rpm
+# and the feeds; the spindle is handled by the commands. Z = 0 is the surface of the part.
 
 using Base
 using ScaleEngraver
@@ -24,11 +24,9 @@ export program Main
     SafeZHeightForWorkpiece = 15
     Rpm = 13000
     SetFeedTechnology plunge=200 finishing=800
-    Spindle On
 
     EngraveDial X=60 Y=10 Z=0 radius=50 kind=DialKind.Protractor
 
-    Spindle Off
     MoveToParkPosition
 endprogram
 
