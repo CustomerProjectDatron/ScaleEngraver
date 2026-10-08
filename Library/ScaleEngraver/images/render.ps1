@@ -7,3 +7,5 @@ Get-ChildItem $dir -Filter *.svg | ForEach-Object {
     & $resvg --width 64 $_.FullName $png
 }
 Write-Host "rendered" (Get-ChildItem $dir -Filter *.png).Count "icons"
+# header images of the top-level commands (wider than the 64 px parameter icons)
+Get-ChildItem $dir -Filter header_*.svg | ForEach-Object { & $resvg --width 360 $_.FullName ([IO.Path]::ChangeExtension($_.FullName, ".png")) }

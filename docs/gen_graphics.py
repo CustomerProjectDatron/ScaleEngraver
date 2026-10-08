@@ -152,10 +152,10 @@ body = [f'<rect x="{xa}" y="{sy}" width="{xb-xa}" height="130" fill="#e3e8ef"/>'
         f'<polyline points="{x2},{dy} {x2},{ry}" fill="none" stroke="{INK}" stroke-width="3" '
         f'stroke-dasharray="10 7"/>',
         f'<circle cx="{x1}" cy="{dy}" r="6" fill="{ORG}"/>',
-        text(705, ry + 6, "retractZ", 20, INK, "start"),
-        text(705, ay + 6, "approachZ", 20, INK, "start"),
-        text(705, sy + 6, "surface Z=0", 20, INK, "start", "700"),
+        text(705, ry + 6, "SafeZHeightForWorkpiece", 20, INK, "start"),
+        text(705, ay + 6, "feedHeight", 20, INK, "start"),
+        text(705, sy + 6, "surface Z", 20, INK, "start", "700"),
         text(705, dy + 6, "depth", 20, ORG, "start", "700"),
         text((x1 + x2) / 2, dy + 38, "cut", 20, ACC, "middle", "700")]
-w("docs/move_sequence.svg", svg(900, 360, "\n".join(body), BG))
+w("docs/move_sequence.svg", svg(1100, 360, "\n".join(body), BG))
 print("ok")

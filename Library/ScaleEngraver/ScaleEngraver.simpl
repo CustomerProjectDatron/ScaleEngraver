@@ -4,1183 +4,508 @@
 @ SystemModule = true @
 @ Author = "Benjamin Boeck" @
 
-
-# Engraves linear and circular scales (major and minor ticks plus value labels).
+# ScaleEngraver: engraves rulers and dials with ONE command each.
 #
-# The module is split in two layers that never mix:
-# 1. Planning - PlanLinearScale / PlanCircularScale turn a parameter structure into a ScalePlan
-#    (plain data: tick lines, arcs, labels). No machine command is issued, so a plan can be
-#    inspected, previewed, serialised (System::ValueToJson) or served by a future web API.
-# 2. Execution - EngraveScalePlan turns a ScalePlan into motion and text engraving. It is pure
-#    motion: the calling program selects the tool and sets Rpm, Feed and Spindle On/Off.
+#   EngraveRuler X=10 Y=10 Z=0 length=100
+#   EngraveDial  X=60 Y=60 Z=0 radius=30
 #
-# Units: lengths in mm, angles in degrees (counter-clockwise from +X), depths are positive
-# numbers = how deep below the workpiece surface (Z = 0); the library converts them to the Z values
+# Everything except the position and the size has a default, so a scale needs one line. The defaults are
+# defined once in millimetres and are converted automatically when the control is set to inch:
+#
+#   tickLength    6 mm     length of the LONGEST tick (all other ticks are derived from it)
+#   factor        0.7      every finer tick level is 70 percent as long as the level before it
+#   depth         0.1 mm   engraving depth of ticks, line and numbers (positive = how deep)
+#   labelHeight   half the tick length, at least 2.5 mm
+#   feedHeight    1 mm     height above Z where the movement starts with the plunge feed
+#   infeedZ       depth    maximum depth per cut (one cut by default)
+#
+# The calling program selects the tool, sets Rpm, the feeds (SetFeedTechnology plunge= finishing=), the retract height
+# (SafeZHeightForWorkpiece) and Spindle On/Off. X, Y and Z give the position like in the Line command; Z is the height of
+# the surface, the depth is measured from it. Every engraving starts with PrePositioning: up to the safe height, over the
+# start, down to the feed height.
+# The engine (parameter structures, geometry as data) is the module ScaleEngraverCore.
 
 using Base
-using Engrave
+using ScaleEngraverCore
 import Math
-import String
-
-# ---------------------------------------------------------------------------------------
-# Types
-# ---------------------------------------------------------------------------------------
-
-@doc: Side of the scale line on which the ticks and labels are drawn.
-Linear scale: Positive = left of the scale direction (up for a scale along +X), Negative = right.
-Circular scale: Positive = outside of the circle, Negative = inside. @
-export enumeration TickSide (Positive, Negative)
-
-@doc: How the labels of a circular scale are rotated.
-Tangential = text follows the circle (text up points away from the centre),
-Radial = text runs along the radius (flipped on the left half to stay readable),
-Horizontal = text is not rotated. @
-export enumeration LabelOrientation (Tangential, Radial, Horizontal)
-
-@doc: Horizontal alignment of a label relative to its engraving position. @
-export enumeration LabelAlignment (Left, Center, Right)
-
-@doc: Length and engraving depth of one tick class (major or minor). @
-export structure TickStyle (
-    tickLength:number
-        @doc: ![](images/tickLength.png)
-
-Length of the tick in mm, measured from the scale line away from it.@,
-    tickDepth:number
-        @doc: ![](images/tickDepth.png)
-
-Engraving depth of the tick in mm, positive = depth below the surface.@
-)
-
-@doc: Text settings of the value labels. @
-export structure LabelSettings (
-    labelHeight:number
-        @doc: ![](images/labelHeight.png)
-
-Font size: character height in mm.@,
-    labelWidth:number
-        @doc: ![](images/labelWidth.png)
-
-Character width in mm.@,
-    labelDepth:number
-        @doc: ![](images/depth.png)
-
-Engraving depth of the text in mm, positive = depth below the surface.@,
-    labelOffset:number
-        @doc: ![](images/labelOffset.png)
-
-Gap in mm between the end of the major tick and the text.@,
-    decimals:number
-        @doc: Number of decimal places of the label text.@,
-    labelEvery:number
-        @doc: ![](images/labelEvery.png)
-
-1 labels every major tick, 2 every second major tick and so on.@,
-    skipFirstLabel:boolean
-        @doc: ![](images/skipFirstLabel.png)
-
-No label at the first major tick, e.g. when it lies on the border of the part.@,
-    skipLastLabel:boolean
-        @doc: ![](images/skipLastLabel.png)
-
-No label at the last major tick. Ignored for a closed 360 degree circle.@,
-    fractionDenominator:number
-        @doc: ![](images/fractionDenominator.png)
-
-0 = labels are decimal numbers. Above 0 = labels are fractions of 1/denominator, e.g. 8 gives 1/8, 1/4, 3/8 and 1 1/2. The value is rounded to the nearest 1/denominator and reduced. Typical values: 2, 4, 8, 16.@
-)
-
-@doc: Value range of a scale and its tick spacing. @
-export structure ScaleDivision (
-    valueStart:number
-        @doc: Scale value at the start of the scale.@,
-    valueEnd:number
-        @doc: Scale value at the end of the scale.@,
-    majorStep:number
-        @doc: ![](images/majorStep.png)
-
-Value distance between two major ticks.@,
-    minorDivisions:number
-        @doc: ![](images/minorDivisions.png)
-
-Number of minor intervals per major interval. 10 gives nine minor ticks between two major ticks.@,
-    skipFirstTick:boolean
-        @doc: ![](images/skipFirstTick.png)
-
-Do not engrave the tick (and its label) at valueStart, e.g. when it lies on the edge of the part.@,
-    skipLastTick:boolean
-        @doc: ![](images/skipLastTick.png)
-
-Do not engrave the tick (and its label) at the end of the range.@,
-    mediumEvery:number
-        @doc: ![](images/mediumEvery.png)
-
-Intermediate ticks: every n-th minor interval gets a medium tick (e.g. 5 with minorDivisions 10 gives a tick at 5 between the major ticks at 0 and 10). 0 = no medium ticks. Major ticks win where both coincide.@
-)
-
-@doc: A straight scale. It starts at (originX, originY) and runs rotationAngle degrees from +X
-over scaleLength mm. The scale value valueStart is at the origin, valueEnd at the far end. @
-export structure LinearScale (
-    originX:number
-        @doc: X of the start of the scale in mm.@,
-    originY:number
-        @doc: Y of the start of the scale in mm.@,
-    scaleLength:number
-        @doc: ![](images/scaleLength.png)
-
-Length of the scale in mm from valueStart to valueEnd.@,
-    rotationAngle:number
-        @doc: ![](images/rotationAngle.png)
-
-Direction of the scale in degrees, 0 = along +X, counter-clockwise.@,
-    division:ScaleDivision
-        @doc: Value range and tick spacing.@,
-    side:TickSide
-        @doc: ![](images/side_positive.png) ![](images/side_negative.png)
-
-Side of the scale line on which ticks and labels are engraved.@,
-    majorTick:TickStyle
-        @doc: Length and depth of the major ticks.@,
-    minorTick:TickStyle
-        @doc: Length and depth of the minor ticks.@,
-    mediumTick:TickStyle
-        @doc: Length and depth of the medium (intermediate) ticks, see ScaleDivision.mediumEvery.@,
-    labelFormat:LabelSettings
-        @doc: Text settings of the labels.@,
-    baselineDepth:number
-        @doc: ![](images/baselineDepth.png)
-
-Depth of the scale line itself in mm (positive = depth below the surface); 0 = the line is not engraved.@
-)
-
-@doc: A circular scale on a circle around (centerX, centerY). The scale runs from startAngle to
-endAngle (degrees, counter-clockwise; endAngle < startAngle runs clockwise). A sweep of 360
-degrees closes the circle: the closing tick and label are not engraved twice. @
-export structure CircularScale (
-    centerX:number
-        @doc: X of the circle centre in mm.@,
-    centerY:number
-        @doc: Y of the circle centre in mm.@,
-    radius:number
-        @doc: ![](images/radius.png)
-
-Radius of the scale circle in mm; the ticks start on this circle.@,
-    startAngle:number
-        @doc: ![](images/startAngle.png)
-
-Angle of valueStart in degrees, 0 = +X, 90 = +Y (12 o'clock), counter-clockwise.@,
-    endAngle:number
-        @doc: ![](images/endAngle.png)
-
-Angle of valueEnd in degrees. Smaller than startAngle runs clockwise.@,
-    division:ScaleDivision
-        @doc: Value range and tick spacing.@,
-    side:TickSide
-        @doc: ![](images/side_positive.png) ![](images/side_negative.png)
-
-Positive = ticks and labels outside the circle, Negative = inside.@,
-    majorTick:TickStyle
-        @doc: Length and depth of the major ticks.@,
-    minorTick:TickStyle
-        @doc: Length and depth of the minor ticks.@,
-    mediumTick:TickStyle
-        @doc: Length and depth of the medium (intermediate) ticks, see ScaleDivision.mediumEvery.@,
-    labelFormat:LabelSettings
-        @doc: Text settings of the labels.@,
-    orientation:LabelOrientation
-        @doc: ![](images/orientation_tangential.png) ![](images/orientation_radial.png) ![](images/orientation_horizontal.png)
-
-How the labels are rotated.@,
-    baselineDepth:number
-        @doc: ![](images/baselineDepth.png)
-
-Depth of the circle line itself in mm (positive = depth below the surface); 0 = the line is not engraved.@
-)
-
-@doc: An inch ruler. The unit is halved again and again: whole units get the longest tick and a big number,
-halves, quarters, eighths and so on get shorter ticks and, down to a level you choose, a small fraction
-(1/2, 1/4, 3/4). levels = 4 ends at sixteenths, levels = 5 at thirty-seconds. The scale starts at
-(originX, originY), runs rotationAngle degrees from +X over scaleLength and counts whole units from valueStart. @
-export structure FractionScale (
-    originX:number
-        @doc: X of the start of the scale (in the unit of the control).@,
-    originY:number
-        @doc: Y of the start of the scale.@,
-    scaleLength:number
-        @doc: ![](images/scaleLength.png)
-
-Length of the scale from valueStart to valueEnd.@,
-    rotationAngle:number
-        @doc: ![](images/rotationAngle.png)
-
-Direction of the scale in degrees, 0 = along +X, counter-clockwise.@,
-    valueStart:number
-        @doc: Value at the start of the scale in whole units, e.g. 0. Use a whole number.@,
-    valueEnd:number
-        @doc: Value at the end of the scale in whole units, e.g. 6 for 6 inch.@,
-    levels:number
-        @doc: ![](images/levels.png)
-
-How often the unit is halved: 1 = halves, 2 = quarters, 3 = eighths, 4 = sixteenths, 5 = thirty-seconds. Every level has its own tick length.@,
-    tickStyles:TickStyle[]
-        @doc: ![](images/tickStyles.png)
-
-Tick length and depth per level: entry 0 for the whole units, 1 for the halves, 2 for the quarters and so on (levels + 1 entries, longest first).@,
-    unitLabel:LabelSettings
-        @doc: ![](images/unitLabel.png)
-
-Text of the big whole-unit numbers (1, 2, 3 ...) above the longest ticks: size, depth, gap, label every n-th unit, skip first or last.@,
-    fractionLabel:LabelSettings
-        @doc: ![](images/fractionLabel.png)
-
-Text of the small fractions (1/2, 1/4, 3/4) above the shorter ticks, usually smaller than the unit numbers. Only the fractional part is written.@,
-    fractionLabelLevel:number
-        @doc: ![](images/fractionLabelLevel.png)
-
-Fractions are written down to this level: 0 = none, 1 = halves, 2 = also quarters, 3 = also eighths. Finer ticks get no number.@,
-    side:TickSide
-        @doc: ![](images/side_positive.png) ![](images/side_negative.png)
-
-Side of the scale line for ticks and labels: Positive = left of the direction, Negative = right.@,
-    skipFirstTick:boolean
-        @doc: ![](images/skipFirstTick.png)
-
-Do not engrave the tick and its number at valueStart.@,
-    skipLastTick:boolean
-        @doc: ![](images/skipLastTick.png)
-
-Do not engrave the tick and its number at valueEnd.@,
-    baselineDepth:number
-        @doc: ![](images/baselineDepth.png)
-
-Depth of the scale line itself in mm (positive = depth below the surface); 0 = the line is not engraved.@
-)
-@doc: Heights and approach of the engraving motion. Tool, spindle speed, feeds and spindle on/off are NOT
-part of the library: the calling program sets them (Tool, Rpm, Feed, Spindle On) before the
-engraving call. Ticks and lines: rapid to retractZ, rapid to the start, rapid down to approachZ (a little above the
-surface), then feed down to the depth and cut horizontally. Between two engravings the tool always moves up,
-over and down again - no connecting move at depth. Text: StandardTextEngrave does its own
-approach; retractZ is passed as its rapid level (strokeRapidZ), approachZ as its cutting level (strokeCuttingZ). @
-export structure EngraveHeights (
-    retractZ:number
-        @doc: ![](images/retractZ.png)
-
-Clearance height in mm between two engravings (Z = 0 is the surface).@,
-    approachZ:number
-        @doc: ![](images/approachZ.png)
-
-Height in mm just above the surface where the rapid move ends and the feed move into the material starts, e.g. 0.5.@,
-    safeZ:number
-        @doc: ![](images/safeZ.png)
-
-Height in mm for the final retract after the last engraving.@
-)
-
-# Plan elements (pure data)
-@doc: A straight engraved line: a tick, or the baseline of a linear scale. @
-export structure ScaleLine (
-    x1:number
-        @doc: Start X in mm.@,
-    y1:number
-        @doc: Start Y in mm.@,
-    x2:number
-        @doc: End X in mm.@,
-    y2:number
-        @doc: End Y in mm.@,
-    lineDepth:number
-        @doc: ![](images/depth.png)
-
-Engraving depth in mm, positive = depth below the surface.@,
-    isMajor:boolean
-        @doc: True for a major tick and for a baseline.@
-)
-
-@doc: An engraved circular arc: the baseline of a circular scale. @
-export structure ScaleArc (
-    arcCenterX:number
-        @doc: Centre X in mm.@,
-    arcCenterY:number
-        @doc: Centre Y in mm.@,
-    arcRadius:number
-        @doc: Radius in mm.@,
-    arcStart:number
-        @doc: Start angle in degrees.@,
-    arcEnd:number
-        @doc: End angle in degrees; smaller than the start angle runs clockwise.@,
-    arcDepth:number
-        @doc: ![](images/depth.png)
-
-Engraving depth in mm, positive = depth below the surface.@
-)
-
-@doc: One engraved text. Vertically centred on (x, y); horizontally placed by alignment. @
-export structure ScaleLabel (
-    text:string
-        @doc: The label text.@,
-    x:number
-        @doc: X of the text position in mm.@,
-    y:number
-        @doc: Y of the text position in mm.@,
-    rotation:number
-        @doc: Text rotation in degrees, counter-clockwise.@,
-    textHeight:number
-        @doc: Character height in mm.@,
-    textWidth:number
-        @doc: Character width in mm.@,
-    textDepth:number
-        @doc: ![](images/depth.png)
-
-Engraving depth in mm, positive = depth below the surface.@,
-    alignment:LabelAlignment
-        @doc: Horizontal alignment relative to (x, y).@
-)
-
-@doc: The complete result of planning a scale: everything that will be engraved, as data. @
-export structure ScalePlan (
-    lines:ScaleLine[]
-        @doc: Baseline (linear scales) and all ticks, in scale order.@,
-    arcs:ScaleArc[]
-        @doc: Baseline arc of a circular scale (empty when baselineDepth is 0).@,
-    labels:ScaleLabel[]
-        @doc: All labels, in scale order.@
-)
-
-# Internal: one tick position along the scale, fraction = 0 at valueStart, 1 at valueEnd
-structure ScaleTick (value:number, fraction:number, isMajor:boolean, isMedium:boolean, hasLabel:boolean, text:string)
-
-# ---------------------------------------------------------------------------------------
-# Constructors
-# ---------------------------------------------------------------------------------------
-
-@doc: Creates the length and depth of one tick class (major or minor). @
-export program NewTickStyle (
-    tickLength:number
-        @doc: ![](images/tickLength.png)
-
-Length of the tick in mm.@
-    tickDepth:number
-        @doc: ![](images/tickDepth.png)
-
-Engraving depth in mm, positive = depth below the surface.@
-    ) returns TickStyle
-    return TickStyle = {tickLength, tickDepth}
-endprogram
-
-@doc: Creates the text settings of the labels. Only the font size is mandatory. @
-export program NewLabelSettings (
-    labelHeight:number
-        @doc: ![](images/labelHeight.png)
-
-Font size: character height in mm.@
-    optional labelWidth:number
-        @doc: ![](images/labelWidth.png)
-
-Character width in mm. Default: 0.7 x labelHeight.@
-    optional labelDepth:number
-        @doc: ![](images/depth.png)
-
-Engraving depth of the text in mm (positive = depth below the surface). Default: 0.1.@
-    optional labelOffset:number
-        @doc: ![](images/labelOffset.png)
-
-Gap in mm between the end of the major tick and the text. Default: 0.3 x labelHeight.@
-    optional decimals:number
-        @doc: Decimal places of the label text. Default: 0.@
-    optional labelEvery:number
-        @doc: ![](images/labelEvery.png)
-
-Label every n-th major tick. Default: 1 (every major tick).@
-    optional skipFirstLabel:boolean
-        @doc: ![](images/skipFirstLabel.png)
-
-No label at the first major tick (e.g. the 0 on the part edge). Default: false.@
-    optional skipLastLabel:boolean
-        @doc: ![](images/skipLastLabel.png)
-
-No label at the last major tick. Default: false.@
-    optional fractionDenominator:number
-        @doc: ![](images/fractionDenominator.png)
-
-0 = decimal numbers. Above 0 = labels as fractions of 1/denominator, e.g. 8 for eighths (1/8, 1/4, 3/8, 1 1/2). Default: 0.@
-    ) returns LabelSettings
-    if not labelWidth hasvalue
-        labelWidth = labelHeight * 0.7
-    endif
-    if not labelDepth hasvalue
-        labelDepth = 0.1
-    endif
-    if not labelOffset hasvalue
-        labelOffset = labelHeight * 0.3
-    endif
-    if not decimals hasvalue
-        decimals = 0
-    endif
-    if not labelEvery hasvalue
-        labelEvery = 1
-    endif
-    if not skipFirstLabel hasvalue
-        skipFirstLabel = false
-    endif
-    if not skipLastLabel hasvalue
-        skipLastLabel = false
-    endif
-    if not fractionDenominator hasvalue
-        fractionDenominator = 0
-    endif
-    return LabelSettings = {labelHeight, labelWidth, labelDepth, labelOffset, decimals, labelEvery, skipFirstLabel, skipLastLabel, fractionDenominator}
-endprogram
-
-@doc: Creates the value range and tick spacing of a scale, for example 0..100 with a major tick
-every 10 and ten minor intervals per major interval. @
-export program NewScaleDivision (
-    valueStart:number
-        @doc: Scale value at the start of the scale.@
-    valueEnd:number
-        @doc: Scale value at the end of the scale.@
-    majorStep:number
-        @doc: ![](images/majorStep.png)
-
-Value distance between two major ticks.@
-    optional minorDivisions:number
-        @doc: ![](images/minorDivisions.png)
-
-Minor intervals per major interval. Default: 10.@
-    optional skipFirstTick:boolean
-        @doc: ![](images/skipFirstTick.png)
-
-Do not engrave the tick (and its label) at valueStart. Default: false.@
-    optional skipLastTick:boolean
-        @doc: ![](images/skipLastTick.png)
-
-Do not engrave the tick (and its label) at the end of the range. Default: false.@
-    optional mediumEvery:number
-        @doc: ![](images/mediumEvery.png)
-
-Medium (intermediate) tick every n-th minor interval, e.g. 5 with minorDivisions 10. Default: 0 (none).@
-    ) returns ScaleDivision
-    if not minorDivisions hasvalue
-        minorDivisions = 10
-    endif
-    if not skipFirstTick hasvalue
-        skipFirstTick = false
-    endif
-    if not skipLastTick hasvalue
-        skipLastTick = false
-    endif
-    if not mediumEvery hasvalue
-        mediumEvery = 0
-    endif
-    return ScaleDivision = {valueStart, valueEnd, majorStep, minorDivisions, skipFirstTick, skipLastTick, mediumEvery}
-endprogram
-
-@doc: Creates the heights of the engraving motion. @
-export program NewEngraveHeights (
-    optional retractZ:number
-        @doc: ![](images/retractZ.png)
-
-Clearance height in mm between two engravings. Default: 2.@
-    optional approachZ:number
-        @doc: ![](images/approachZ.png)
-
-Height in mm just above the surface where the feed move into the material starts. Default: 0.5.@
-    optional safeZ:number
-        @doc: ![](images/safeZ.png)
-
-Height in mm for the final retract. Default: 20.@
-    ) returns EngraveHeights
-    if not retractZ hasvalue
-        retractZ = 2
-    endif
-    if not approachZ hasvalue
-        approachZ = 0.5
-    endif
-    if not safeZ hasvalue
-        safeZ = 20
-    endif
-    return EngraveHeights = {retractZ, approachZ, safeZ}
-endprogram
-
-@doc: Creates a straight scale (ruler). The scale value valueStart is at the origin. @
-export program NewLinearScale (
-    originX:number
-        @doc: X of the start of the scale in mm.@
-    originY:number
-        @doc: Y of the start of the scale in mm.@
-    scaleLength:number
-        @doc: ![](images/scaleLength.png)
-
-Length of the scale in mm.@
-    division:ScaleDivision
-        @doc: Value range and tick spacing, see NewScaleDivision.@
-    majorTick:TickStyle
-        @doc: Length and depth of the major ticks, see NewTickStyle.@
-    minorTick:TickStyle
-        @doc: Length and depth of the minor ticks, see NewTickStyle.@
-    labelFormat:LabelSettings
-        @doc: Text settings of the labels, see NewLabelSettings.@
-    optional mediumTick:TickStyle
-        @doc: Medium (intermediate) tick style, used where division.mediumEvery applies. Default: halfway between the major and the minor tick.@
-    optional rotationAngle:number
-        @doc: ![](images/rotationAngle.png)
-
-Direction of the scale in degrees, 0 = along +X. Default: 0.@
-    optional side:TickSide
-        @doc: ![](images/side_positive.png) ![](images/side_negative.png)
-
-Side of the scale line for ticks and labels. Default: TickSide.Positive (left of the direction, up for 0 degrees).@
-    optional baselineDepth:number
-        @doc: ![](images/baselineDepth.png)
-
-Depth of the scale line in mm (positive = depth below the surface); 0 = not engraved. Default: 0.@
-    ) returns LinearScale
-    if not mediumTick hasvalue
-        mediumTick = TickStyle = {(majorTick.tickLength + minorTick.tickLength) / 2, (majorTick.tickDepth + minorTick.tickDepth) / 2}
-    endif
-    if not rotationAngle hasvalue
-        rotationAngle = 0
-    endif
-    if not side hasvalue
-        side = TickSide.Positive
-    endif
-    if not baselineDepth hasvalue
-        baselineDepth = 0
-    endif
-    return LinearScale = {originX, originY, scaleLength, rotationAngle, division, side, majorTick, minorTick, mediumTick, labelFormat, baselineDepth}
-endprogram
-
-@doc: Creates a circular scale (dial, protractor). By default it runs clockwise from 12 o'clock
-once around the circle. @
-export program NewCircularScale (
-    centerX:number
-        @doc: X of the circle centre in mm.@
-    centerY:number
-        @doc: Y of the circle centre in mm.@
-    radius:number
-        @doc: ![](images/radius.png)
-
-Radius of the scale circle in mm.@
-    division:ScaleDivision
-        @doc: Value range and tick spacing, see NewScaleDivision.@
-    majorTick:TickStyle
-        @doc: Length and depth of the major ticks, see NewTickStyle.@
-    minorTick:TickStyle
-        @doc: Length and depth of the minor ticks, see NewTickStyle.@
-    labelFormat:LabelSettings
-        @doc: Text settings of the labels, see NewLabelSettings.@
-    optional mediumTick:TickStyle
-        @doc: Medium (intermediate) tick style, used where division.mediumEvery applies. Default: halfway between the major and the minor tick.@
-    optional startAngle:number
-        @doc: ![](images/startAngle.png)
-
-Angle of valueStart in degrees, 0 = +X, 90 = 12 o'clock. Default: 90.@
-    optional endAngle:number
-        @doc: ![](images/endAngle.png)
-
-Angle of valueEnd in degrees; smaller than startAngle runs clockwise. Default: startAngle - 360 (one full turn clockwise).@
-    optional side:TickSide
-        @doc: ![](images/side_positive.png) ![](images/side_negative.png)
-
-Positive = ticks and labels outside the circle, Negative = inside. Default: Positive.@
-    optional orientation:LabelOrientation
-        @doc: ![](images/orientation_tangential.png) ![](images/orientation_radial.png) ![](images/orientation_horizontal.png)
-
-Label rotation. Default: LabelOrientation.Tangential.@
-    optional baselineDepth:number
-        @doc: ![](images/baselineDepth.png)
-
-Depth of the circle line in mm (positive = depth below the surface); 0 = not engraved. Default: 0.@
-    ) returns CircularScale
-    if not mediumTick hasvalue
-        mediumTick = TickStyle = {(majorTick.tickLength + minorTick.tickLength) / 2, (majorTick.tickDepth + minorTick.tickDepth) / 2}
-    endif
-    if not startAngle hasvalue
-        startAngle = 90
-    endif
-    if not endAngle hasvalue
-        endAngle = startAngle - 360
-    endif
-    if not side hasvalue
-        side = TickSide.Positive
-    endif
-    if not orientation hasvalue
-        orientation = LabelOrientation.Tangential
-    endif
-    if not baselineDepth hasvalue
-        baselineDepth = 0
-    endif
-    return CircularScale = {centerX, centerY, radius, startAngle, endAngle, division, side, majorTick, minorTick, mediumTick, labelFormat, orientation, baselineDepth}
-endprogram
-
-# ---------------------------------------------------------------------------------------
-# Planning layer - no machine commands below this line until "Execution layer"
-# ---------------------------------------------------------------------------------------
-
-function SideSign (side:TickSide) returns number
-    if side == TickSide.Negative
-        return -1
+import AxisSystem
+
+@doc: The kind of ruler. Millimeter: ticks every 1 mm, a medium tick every 5 mm, a long tick with a number every
+10 mm (the numbers are millimetres). Centimeter: the same ticks, the numbers are centimetres (1, 2, 3 ...).
+Inch: an inch ruler built by halving - inch, 1/2, 1/4, 1/8, 1/16 - each level with a shorter tick, big numbers for
+the inches and small fractions beside the longer ticks. @
+export enumeration ScaleKind (Millimeter, Centimeter, Inch)
+
+@doc: The kind of dial. Degrees: a full circle 0 to 360, a number every 30 degrees, a tick every 5 degrees.
+Percent: a full circle 0 to 100, a number every 10. Gauge: 0 to 100 over 270 degrees, from the lower left over
+the top to the lower right. Protractor: a half circle 0 to 180 with ticks and horizontal numbers inside. @
+export enumeration DialKind (Degrees, Percent, Gauge, Protractor)
+
+@doc: How the numbers of a dial are turned. Tangential: the numbers follow the circle, their top points away from the centre.
+Radial: the numbers run along the radius. Horizontal: the numbers are not turned. @
+export enumeration NumberOrientation (Tangential, Radial, Horizontal)
+
+# Millimetres per unit of the control: 1 when the control is metric, 25.4 when it is set to inch.
+program MillimetersPerUnit returns number
+    system = AxisSystem::MeasuringSystem
+    if system == AxisSystem::MeasuringSystems.Imperial
+        return 25.4
     endif
     return 1
-endfunction
-
-@doc: Writes a value as a fraction for inch scales: the value is rounded to the nearest 1/denominator and reduced,
-for example 0.375 with denominator 8 gives 3/8, 1.5 gives 1 1/2 and 2 gives 2. @
-program FractionText (
-    value:number
-        @doc: The value to write.@
-    denominator:number
-        @doc: Whole number above 0: the value is rounded to the nearest 1/denominator.@
-    ) returns string
-    total = Math::Round(Math::Abs(value) * denominator)
-    whole = Math::Floor(total / denominator)
-    remainder = total - whole * denominator
-    result = ValueToString(whole)
-    if remainder > 0
-        a = remainder
-        b = denominator
-        while b > 0
-            t = b
-            b = a - Math::Floor(a / b) * b
-            a = t
-        endwhile
-        fraction = ValueToString(remainder / a) + "/" + ValueToString(denominator / a)
-        if whole > 0
-            result = result + " " + fraction
-        else
-            result = fraction
-        endif
-    endif
-    if value < 0 and total > 0
-        result = "-" + result
-    endif
-    return result
 endprogram
 
-@doc: Computes the ticks along the value range: position (fraction of the range), major or minor,
-and the label text. closeRing = true drops the tick at valueEnd (closed 360 degree circle). Ticks
-removed by skipFirstTick / skipLastTick are not part of the result. @
-program BuildTicks (
-    division:ScaleDivision
-        @doc: Value range and tick spacing.@
-    labelFormat:LabelSettings
-        @doc: Which major ticks get a label, and how many decimals.@
-    closeRing:boolean
-        @doc: True for a closed circle: the tick at valueEnd coincides with the one at valueStart.@
-    ) returns ScaleTick[]
-    ticks:ScaleTick[] = {}
-    span = division.valueEnd - division.valueStart
-    minorCount = Math::Round(division.minorDivisions)
-    if minorCount < 1
-        minorCount = 1
+# A readable distance between two numbered ticks for a custom value range: 1, 2 or 5 times a power of ten,
+# so that the range has roughly ten numbers.
+program NiceMajorStep (span:number) returns number
+    raw = Math::Abs(span) / 10
+    if raw <= 0
+        return 1
     endif
-    labelEvery = Math::Round(labelFormat.labelEvery)
-    if labelEvery < 1
-        labelEvery = 1
+    magnitude = Math::Pow(10, Math::Floor(Math::Log10(raw)))
+    mantissa = raw / magnitude
+    niceStep = 10 * magnitude
+    if mantissa <= 5.0001
+        niceStep = 5 * magnitude
     endif
-    minorStep = division.majorStep / minorCount
-    tickCount = Math::Floor(span / minorStep + 0.000001)
-    lastIndex = tickCount
-    if closeRing and Math::Abs(tickCount * minorStep - span) < 0.000001
-        lastIndex = tickCount - 1
+    if mantissa <= 2.0001
+        niceStep = 2 * magnitude
     endif
-    lastMajorIndex = Math::Floor(lastIndex / minorCount) * minorCount
-    for i from 0 to lastIndex
-        skipTick = false
-        if i == 0 and division.skipFirstTick
-            skipTick = true
-        endif
-        if i == lastIndex and division.skipLastTick
-            skipTick = true
-        endif
-        if not skipTick
-            value = division.valueStart + i * minorStep
-            isMajor = (i % minorCount) == 0
-            isMedium = false
-            if division.mediumEvery > 0 and not isMajor
-                isMedium = (i % Math::Round(division.mediumEvery)) == 0
-            endif
-            hasLabel = false
-            if isMajor
-                majorIndex = i / minorCount
-                hasLabel = (majorIndex % labelEvery) == 0
-                if i == 0 and labelFormat.skipFirstLabel
-                    hasLabel = false
-                endif
-                if i == lastMajorIndex and labelFormat.skipLastLabel and not closeRing
-                    hasLabel = false
-                endif
-            endif
-            text = ""
-            if hasLabel
-                if labelFormat.fractionDenominator > 0
-                    text = FractionText(value=value denominator=Math::Round(labelFormat.fractionDenominator))
-                else
-                    text = ValueToString(Math::RoundDecimals(value, labelFormat.decimals))
-                endif
-            endif
-            tick:ScaleTick = {value, (value - division.valueStart) / span, isMajor, isMedium, hasLabel, text}
-            append tick to ticks
-        endif
-    endfor
-    return ticks
+    if mantissa <= 1.0001
+        niceStep = magnitude
+    endif
+    return niceStep
 endprogram
 
-# Rough text width: the engraving font has no exact metric, so use the character width.
-function EstimateTextWidth (text:string, charWidth:number) returns number
-    return Math::Max(1, String::StringLength(text)) * charWidth
-endfunction
-
-@doc: Plans a linear scale: computes all tick lines, the optional baseline and the labels as data.
-No machine command is issued. Engrave the result with EngraveScalePlan, or draw it as a preview. @
-export program PlanLinearScale (
-    scale:LinearScale
-        @doc: The linear scale to plan, see NewLinearScale.@
-    ) returns ScalePlan
-    lines:ScaleLine[] = {}
-    arcs:ScaleArc[] = {}
-    labels:ScaleLabel[] = {}
-    ticks = BuildTicks(division=scale.division labelFormat=scale.labelFormat closeRing=false)
-    tickDir = SideSign(scale.side)
-    ca = Math::CosDeg(scale.rotationAngle)
-    sa = Math::SinDeg(scale.rotationAngle)
-    nx = -sa
-    ny = ca
-
-    if scale.baselineDepth > 0
-        baseline:ScaleLine = {scale.originX, scale.originY, scale.originX + scale.scaleLength * ca, scale.originY + scale.scaleLength * sa, scale.baselineDepth, true}
-        append baseline to lines
+# How many parts a long-tick distance is divided into: a step of 2 (2, 20, 0.2 ...) gets 4 parts, others 10.
+program NiceMinorDivisions (distance:number) returns number
+    magnitude = Math::Pow(10, Math::Floor(Math::Log10(distance)))
+    mantissa = distance / magnitude
+    if mantissa > 1.9999 and mantissa < 2.0001
+        return 4
     endif
-
-    foreach tick in ticks
-        u = tick.fraction * scale.scaleLength
-        px = scale.originX + u * ca
-        py = scale.originY + u * sa
-        style = scale.minorTick
-        if tick.isMedium
-            style = scale.mediumTick
-        endif
-        if tick.isMajor
-            style = scale.majorTick
-        endif
-        endX = px + tickDir * style.tickLength * nx
-        endY = py + tickDir * style.tickLength * ny
-        tickLine:ScaleLine = {px, py, endX, endY, style.tickDepth, tick.isMajor}
-        append tickLine to lines
-        if tick.hasLabel
-            dist = tickDir * (scale.majorTick.tickLength + scale.labelFormat.labelOffset + scale.labelFormat.labelHeight / 2)
-            labelItem:ScaleLabel = {tick.text, px + dist * nx, py + dist * ny, scale.rotationAngle, scale.labelFormat.labelHeight, scale.labelFormat.labelWidth, scale.labelFormat.labelDepth, LabelAlignment.Center}
-            append labelItem to labels
-        endif
-    endforeach
-    return ScalePlan = {lines, arcs, labels}
+    return 10
 endprogram
 
-@doc: Plans a circular scale: computes all tick lines, the optional baseline arc and the labels as
-data. No machine command is issued. Engrave the result with EngraveScalePlan. @
-export program PlanCircularScale (
-    scale:CircularScale
-        @doc: The circular scale to plan, see NewCircularScale.@
-    ) returns ScalePlan
-    lines:ScaleLine[] = {}
-    arcs:ScaleArc[] = {}
-    labels:ScaleLabel[] = {}
-    sweep = scale.endAngle - scale.startAngle
-    closeRing = Math::Abs(sweep) >= 359.999
-    ticks = BuildTicks(division=scale.division labelFormat=scale.labelFormat closeRing=closeRing)
-    tickDir = SideSign(scale.side)
+@doc: ![](images/header_EngraveRuler.png)
 
-    if scale.baselineDepth > 0
-        baseArc:ScaleArc = {scale.centerX, scale.centerY, scale.radius, scale.startAngle, scale.endAngle, scale.baselineDepth}
-        append baseArc to arcs
-    endif
+Engraves a ruler with one command. Mandatory: where the ruler starts (X, Y, Z) and how long it is. The
+ticks, the numbers, the depth and the heights have defaults (see the module description); the kind is
+Millimeter when the control is metric and Inch when it is set to inch. Example: EngraveRuler X=10 Y=10 Z=0 length=100 @
+export program EngraveRuler (
+    X:number
+        @doc: X of the start of the ruler (the zero tick).@
+    Y:number
+        @doc: Y of the start of the ruler.@
+    Z:number
+        @doc: ![](images/referenceZ.png)
 
-    foreach tick in ticks
-        theta = scale.startAngle + tick.fraction * sweep
-        nx = Math::CosDeg(theta)
-        ny = Math::SinDeg(theta)
-        px = scale.centerX + scale.radius * nx
-        py = scale.centerY + scale.radius * ny
-        style = scale.minorTick
-        if tick.isMedium
-            style = scale.mediumTick
-        endif
-        if tick.isMajor
-            style = scale.majorTick
-        endif
-        tickLine:ScaleLine = {px, py, px + tickDir * style.tickLength * nx, py + tickDir * style.tickLength * ny, style.tickDepth, tick.isMajor}
-        append tickLine to lines
-
-        if tick.hasLabel
-            near = scale.majorTick.tickLength + scale.labelFormat.labelOffset
-            rot = 0
-            dist = 0
-            align = LabelAlignment.Center
-            lx = 0
-            ly = 0
-            if scale.orientation == LabelOrientation.Tangential
-                # text up points away from the centre, baseline follows the circle
-                dist = scale.radius + tickDir * (near + scale.labelFormat.labelHeight / 2)
-                rot = theta - 90
-                lx = scale.centerX + dist * nx
-                ly = scale.centerY + dist * ny
-            endif
-            if scale.orientation == LabelOrientation.Horizontal
-                half = Math::Abs(nx) * EstimateTextWidth(tick.text, scale.labelFormat.labelWidth) / 2 + Math::Abs(ny) * scale.labelFormat.labelHeight / 2
-                dist = scale.radius + tickDir * (near + half)
-                rot = 0
-                lx = scale.centerX + dist * nx
-                ly = scale.centerY + dist * ny
-            endif
-            if scale.orientation == LabelOrientation.Radial
-                # text runs along the radius and is flipped on the left half to stay readable
-                dirSign = 1
-                rot = theta
-                if nx < -0.000001
-                    dirSign = -1
-                    rot = theta + 180
-                endif
-                align = LabelAlignment.Right
-                if dirSign == tickDir
-                    align = LabelAlignment.Left
-                endif
-                dist = scale.radius + tickDir * near
-                lx = scale.centerX + dist * nx
-                ly = scale.centerY + dist * ny
-            endif
-            labelItem:ScaleLabel = {tick.text, lx, ly, rot, scale.labelFormat.labelHeight, scale.labelFormat.labelWidth, scale.labelFormat.labelDepth, align}
-            append labelItem to labels
-        endif
-    endforeach
-    return ScalePlan = {lines, arcs, labels}
-endprogram
-
-@doc: Creates a fraction scale (inch ruler). Only position, length, values and the unit number text are mandatory.
-Tick length and depth are derived from the longest tick (the whole units) and shrink level by level; the finest level
-gets 30 percent of the length and 50 percent of the depth. @
-export program NewFractionScale (
-    originX:number
-        @doc: X of the start of the scale.@
-    originY:number
-        @doc: Y of the start of the scale.@
-    scaleLength:number
+Z of the surface of the part at the ruler. All depths are measured from this height.@
+    length:number
         @doc: ![](images/scaleLength.png)
 
-Length of the scale from valueStart to valueEnd.@
-    valueStart:number
-        @doc: Value at the start in whole units, e.g. 0.@
-    valueEnd:number
-        @doc: Value at the end in whole units, e.g. 6 for 6 inch.@
-    unitLabel:LabelSettings
-        @doc: ![](images/unitLabel.png)
+Length of the ruler in the unit of the control (mm, or inch when the control is set to inch).@
+    optional kind:ScaleKind
+        @doc: Millimeter, Centimeter or Inch. Default: Millimeter on a metric control, Inch on an inch control.@
+    optional valueStart:number
+        @doc: The value at the start of the ruler. Together with valueEnd this makes your own scale, for example a ruler that shows 20 at its start. Default: 0.@
+    optional valueEnd:number
+        @doc: The value at the end of the ruler. The ruler shows the values from valueStart to valueEnd over its length, with a number every 1, 2 or 5 times a power of ten (about ten numbers); change that with majorStep.
+Default: valueStart plus the length (in mm, cm or inch, depending on the kind).@
+    optional majorStep:number
+        @doc: ![](images/majorStep.png)
 
-Text of the big whole-unit numbers, see NewLabelSettings.@
-    optional levels:number
-        @doc: ![](images/levels.png)
-
-How often the unit is halved: 1 = halves, 2 = quarters, 3 = eighths, 4 = sixteenths. Default: 4.@
+Value distance between two long ticks (the ticks with a number). Default: 10 (Millimeter), 1 (Centimeter), 1 (Inch), or chosen by itself when you set valueEnd.@
     optional tickLength:number
         @doc: ![](images/tickLength.png)
 
-Length of the longest tick (the whole units). Default: 3 x the height of the unit numbers.@
-    optional tickDepth:number
-        @doc: ![](images/tickDepth.png)
-
-Depth of the longest tick (positive = depth below the surface). Default: 0.2.@
-    optional tickStyles:TickStyle[]
+Length of the longest tick. All other ticks are derived from it with the factor. Default: 6 mm.@
+    optional factor:number
         @doc: ![](images/tickStyles.png)
 
-Own tick length and depth per level (levels + 1 entries, whole units first). Replaces tickLength and tickDepth.@
-    optional fractionLabel:LabelSettings
-        @doc: ![](images/fractionLabel.png)
+Every finer tick level is this much as long as the level before it: 0.7 gives 100 / 70 / 49 percent of the longest
+tick (millimetre ruler) and 100 / 70 / 49 / 34 / 24 percent (inch ruler down to 1/16). Default: 0.7.@
+    optional depth:number
+        @doc: ![](images/depth.png)
 
-Text of the small fractions. Default: 60 percent of the size of the unit numbers.@
-    optional fractionLabelLevel:number
-        @doc: ![](images/fractionLabelLevel.png)
-
-Fractions are written down to this level: 0 = none, 1 = halves, 2 = also quarters. Default: 1.@
-    optional rotationAngle:number
+Engraving depth of ticks, line and numbers, measured from Z (positive = how deep). Default: 0.1 mm.@
+    optional angle:number
         @doc: ![](images/rotationAngle.png)
 
-Direction of the scale in degrees, 0 = along +X. Default: 0.@
-    optional side:TickSide
-        @doc: ![](images/side_positive.png) ![](images/side_negative.png)
+Direction of the ruler in degrees: 0 = to the right (+X), 90 = upwards (+Y). Default: 0.@
+    optional below:boolean
+        @doc: ![](images/side_negative.png)
 
-Side of the scale line for ticks and labels. Default: TickSide.Positive.@
-    optional skipFirstTick:boolean
+true = ticks and numbers on the right-hand side of the direction (below a ruler running to the right). Default: false = left-hand side (above).@
+    optional labelHeight:number
+        @doc: ![](images/labelHeight.png)
+
+Height of the numbers. Default: half the tick length, at least 2.5 mm.@
+    optional numbers:boolean
+        @doc: false = no numbers, only ticks. Default: true.@
+    optional skipFirst:boolean
         @doc: ![](images/skipFirstTick.png)
 
-Do not engrave the tick and number at valueStart. Default: false.@
-    optional skipLastTick:boolean
+Leave out the first tick and its number, for example where the ruler starts on the edge of the part. Default: false.@
+    optional skipLast:boolean
         @doc: ![](images/skipLastTick.png)
 
-Do not engrave the tick and number at valueEnd. Default: false.@
-    optional baselineDepth:number
+Leave out the last tick and its number. Default: false.@
+    optional baseline:boolean
         @doc: ![](images/baselineDepth.png)
 
-Depth of the scale line in mm (positive = depth below the surface); 0 = not engraved. Default: 0.@
-    ) returns FractionScale
+true = also engrave the line along the ticks. Default: true.@
+    optional levels:number
+        @doc: ![](images/levels.png)
+
+Inch ruler: how often the inch is halved. 3 = down to 1/8, 4 = 1/16, 5 = 1/32. Default: 4.@
+    optional fractionLevel:number
+        @doc: ![](images/fractionLabelLevel.png)
+
+Inch ruler: fractions get a number down to this level. 0 = none, 1 = halves, 2 = also quarters, 3 = also eighths. Default: 2.@
+    optional infeedZ:number
+        @doc: ![](images/infeedZ.png)
+
+Maximum depth per cut. The depth divided by infeedZ gives the number of cuts; they alternate in direction without lifting the tool. Default: the depth (one cut).@
+    optional feedHeight:number
+        @doc: ![](images/feedHeight.png)
+
+Height above Z where the movement starts with the plunge feed. The tool gets there with PrePositioning, via the safe height set with SafeZHeightForWorkpiece. Default: 1 mm.@
+    )
+    mm = MillimetersPerUnit
+    if not kind hasvalue
+        kind = ScaleKind.Millimeter
+        if mm > 1
+            kind = ScaleKind.Inch
+        endif
+    endif
+    if not tickLength hasvalue
+        tickLength = 6 / mm
+    endif
+    if not factor hasvalue
+        factor = 0.7
+    endif
+    if not depth hasvalue
+        depth = 0.1 / mm
+    endif
+    if not angle hasvalue
+        angle = 0
+    endif
+    if not below hasvalue
+        below = false
+    endif
+    if not labelHeight hasvalue
+        labelHeight = Math::Max(2.5, tickLength * mm * 0.5) / mm
+    endif
+    if not numbers hasvalue
+        numbers = true
+    endif
+    if not skipFirst hasvalue
+        skipFirst = false
+    endif
+    if not skipLast hasvalue
+        skipLast = false
+    endif
+    if not baseline hasvalue
+        baseline = true
+    endif
     if not levels hasvalue
         levels = 4
     endif
-    levels = Math::Max(1, Math::Round(levels))
-    if not tickLength hasvalue
-        tickLength = unitLabel.labelHeight * 3
+    if not fractionLevel hasvalue
+        fractionLevel = 2
     endif
-    if not tickDepth hasvalue
-        tickDepth = 0.2
+    if not infeedZ hasvalue
+        infeedZ = 0
     endif
-    if not tickStyles hasvalue
+    if not feedHeight hasvalue
+        feedHeight = 1 / mm
+    endif
+
+    heights = NewEngraveHeights(referenceZ=Z feedHeight=feedHeight infeedZ=infeedZ)
+    side = TickSide.Positive
+    if below
+        side = TickSide.Negative
+    endif
+    lineDepth = 0
+    if baseline
+        lineDepth = depth
+    endif
+    # without numbers: the first number is skipped and the label interval is never reached again
+    labelEvery = 1
+    if not numbers
+        labelEvery = 1000000
+    endif
+
+    # the values of the scale: by default the length of the ruler in the unit of the kind
+    if not valueStart hasvalue
+        valueStart = 0
+    endif
+    customRange = valueEnd hasvalue
+    if not valueEnd hasvalue
+        valueEnd = valueStart + length * mm
+        if kind == ScaleKind.Centimeter
+            valueEnd = valueStart + length * mm / 10
+        endif
+        if kind == ScaleKind.Inch
+            valueEnd = valueStart + length * mm / 25.4
+        endif
+    endif
+
+    if kind == ScaleKind.Inch
+        levels = Math::Max(1, Math::Min(6, Math::Round(levels)))
         styles:TickStyle[] = {}
         for k from 0 to levels
-            levelStyle:TickStyle = {tickLength * (1 - 0.7 * k / levels), tickDepth * (1 - 0.5 * k / levels)}
+            levelStyle:TickStyle = {tickLength * Math::Pow(factor, k), depth}
             append levelStyle to styles
         endfor
-        tickStyles = styles
-    endif
-    if not fractionLabel hasvalue
-        fractionLabel = NewLabelSettings(labelHeight=unitLabel.labelHeight * 0.6 labelWidth=unitLabel.labelWidth * 0.6 labelDepth=unitLabel.labelDepth labelOffset=unitLabel.labelOffset * 0.6)
-    endif
-    if not fractionLabelLevel hasvalue
-        fractionLabelLevel = 1
-    endif
-    if not rotationAngle hasvalue
-        rotationAngle = 0
-    endif
-    if not side hasvalue
-        side = TickSide.Positive
-    endif
-    if not skipFirstTick hasvalue
-        skipFirstTick = false
-    endif
-    if not skipLastTick hasvalue
-        skipLastTick = false
-    endif
-    if not baselineDepth hasvalue
-        baselineDepth = 0
-    endif
-    return FractionScale = {originX, originY, scaleLength, rotationAngle, valueStart, valueEnd, levels, tickStyles, unitLabel, fractionLabel, fractionLabelLevel, side, skipFirstTick, skipLastTick, baselineDepth}
-endprogram
-
-@doc: Plans a fraction scale (inch ruler): computes all tick lines, the optional baseline and the labels as data.
-Whole units are level 0, halves level 1, quarters level 2 and so on; each level has its own tick style. Whole units
-carry the big numbers, the levels up to fractionLabelLevel carry the small fractions (e.g. 3/4). No machine command
-is issued. Engrave the result with EngraveScalePlan. @
-export program PlanFractionScale (
-    scale:FractionScale
-        @doc: The fraction scale to plan, see NewFractionScale.@
-    ) returns ScalePlan
-    lines:ScaleLine[] = {}
-    arcs:ScaleArc[] = {}
-    labels:ScaleLabel[] = {}
-    levels = Math::Max(1, Math::Round(scale.levels))
-    perUnit = Math::Pow(2, levels)
-    span = scale.valueEnd - scale.valueStart
-    tickCount = Math::Round(span * perUnit)
-    lastIndex = tickCount
-    tickDir = SideSign(scale.side)
-    ca = Math::CosDeg(scale.rotationAngle)
-    sa = Math::SinDeg(scale.rotationAngle)
-    nx = -sa
-    ny = ca
-    unitEvery = Math::Max(1, Math::Round(scale.unitLabel.labelEvery))
-
-    if scale.baselineDepth > 0
-        baseline:ScaleLine = {scale.originX, scale.originY, scale.originX + scale.scaleLength * ca, scale.originY + scale.scaleLength * sa, scale.baselineDepth, true}
-        append baseline to lines
-    endif
-
-    for i from 0 to lastIndex
-        skipTick = false
-        if i == 0 and scale.skipFirstTick
-            skipTick = true
+        unitNumbers = NewLabelSettings(labelHeight=labelHeight labelDepth=depth labelEvery=labelEvery skipFirstLabel=not numbers)
+        if not numbers
+            fractionLevel = 0
         endif
-        if i == lastIndex and scale.skipLastTick
-            skipTick = true
-        endif
-        if not skipTick
-            # level of the tick = how many halvings are needed to reach it
-            level = 0
-            if (i % perUnit) <> 0
-                rest = i
-                halvings = 0
-                while (rest % 2) == 0
-                    rest = rest / 2
-                    halvings = halvings + 1
-                endwhile
-                level = levels - halvings
+        inchRuler = NewFractionScale(originX=X originY=Y scaleLength=length valueStart=valueStart valueEnd=valueEnd unitLabel=unitNumbers levels=levels tickStyles=styles fractionLabelLevel=fractionLevel rotationAngle=angle side=side skipFirstTick=skipFirst skipLastTick=skipLast baselineDepth=lineDepth)
+        EngraveFractionScale scale=inchRuler heights=heights
+    else
+        if not majorStep hasvalue
+            majorStep = 10
+            if kind == ScaleKind.Centimeter
+                majorStep = 1
             endif
-            value = scale.valueStart + i / perUnit
-            u = i / tickCount * scale.scaleLength
-            px = scale.originX + u * ca
-            py = scale.originY + u * sa
-            style = scale.tickStyles[level]
-            tickLine:ScaleLine = {px, py, px + tickDir * style.tickLength * nx, py + tickDir * style.tickLength * ny, style.tickDepth, level == 0}
-            append tickLine to lines
-
-            labelText = ""
-            textStyle = scale.unitLabel
-            if level == 0
-                unitIndex = i / perUnit
-                wanted = (unitIndex % unitEvery) == 0
-                if i == 0 and scale.unitLabel.skipFirstLabel
-                    wanted = false
-                endif
-                if i == lastIndex and scale.unitLabel.skipLastLabel
-                    wanted = false
-                endif
-                if wanted
-                    labelText = ValueToString(Math::RoundDecimals(value, scale.unitLabel.decimals))
-                endif
-            else
-                if level <= scale.fractionLabelLevel
-                    labelText = FractionText(value=value - Math::Floor(value) denominator=perUnit)
-                    textStyle = scale.fractionLabel
-                endif
-            endif
-            if labelText <> ""
-                dist = tickDir * (style.tickLength + textStyle.labelOffset + textStyle.labelHeight / 2)
-                labelItem:ScaleLabel = {labelText, px + dist * nx, py + dist * ny, scale.rotationAngle, textStyle.labelHeight, textStyle.labelWidth, textStyle.labelDepth, LabelAlignment.Center}
-                append labelItem to labels
+            if customRange
+                majorStep = NiceMajorStep(span=valueEnd - valueStart)
             endif
         endif
-    endfor
-    return ScalePlan = {lines, arcs, labels}
-endprogram
-# ---------------------------------------------------------------------------------------
-# Execution layer
-# ---------------------------------------------------------------------------------------
-
-@doc: Engraves one straight line at the current Feed: up to the retract height, rapid over the start, rapid down to the approach height, feed down to the depth, cut horizontally to the end, up again. @
-program CutLine (
-    lineSeg:ScaleLine
-        @doc: The line to engrave.@
-    heights:EngraveHeights
-        @doc: Clearance height for the moves between engravings.@
-    )
-    Rapid Z=heights.retractZ
-    Rapid X=lineSeg.x1 Y=lineSeg.y1
-    Rapid Z=heights.approachZ
-    Line Z=-lineSeg.lineDepth
-    Line X=lineSeg.x2 Y=lineSeg.y2
-    Rapid Z=heights.retractZ
-endprogram
-
-@doc: Engraves a circular arc at the current Feed. Arcs are cut in segments of at most 90 degrees
-so that every segment is unambiguous. @
-program CutArc (
-    arcSeg:ScaleArc
-        @doc: The arc to engrave.@
-    heights:EngraveHeights
-        @doc: Clearance height for the moves between engravings.@
-    )
-    sweep = arcSeg.arcEnd - arcSeg.arcStart
-    segments = Math::Ceiling(Math::Abs(sweep) / 90)
-    segSweep = sweep / segments
-    Rapid Z=heights.retractZ
-    Rapid X=arcSeg.arcCenterX + arcSeg.arcRadius * Math::CosDeg(arcSeg.arcStart) Y=arcSeg.arcCenterY + arcSeg.arcRadius * Math::SinDeg(arcSeg.arcStart)
-    Rapid Z=heights.approachZ
-    Line Z=-arcSeg.arcDepth
-    for k from 1 to segments
-        fromAngle = arcSeg.arcStart + (k - 1) * segSweep
-        toAngle = arcSeg.arcStart + k * segSweep
-        startX = arcSeg.arcCenterX + arcSeg.arcRadius * Math::CosDeg(fromAngle)
-        startY = arcSeg.arcCenterY + arcSeg.arcRadius * Math::SinDeg(fromAngle)
-        endX = arcSeg.arcCenterX + arcSeg.arcRadius * Math::CosDeg(toAngle)
-        endY = arcSeg.arcCenterY + arcSeg.arcRadius * Math::SinDeg(toAngle)
-        if sweep > 0
-            Arc CCW X=endX Y=endY dX=arcSeg.arcCenterX - startX dY=arcSeg.arcCenterY - startY
-        else
-            Arc CW X=endX Y=endY dX=arcSeg.arcCenterX - startX dY=arcSeg.arcCenterY - startY
+        minorParts = NiceMinorDivisions(distance=majorStep)
+        mediumAt = 5
+        if minorParts == 4
+            mediumAt = 2
         endif
-    endfor
-    Rapid Z=heights.retractZ
-endprogram
-
-@doc: Engraves one label with Engrave::StandardTextEngrave at its position. The command brings its own approach and counts downwards: depth is positive into the material, and strokeCuttingZ is measured like the depth (positive = below the surface; the final cut is at -(strokeCuttingZ + depth), observed on the control). To start the feed move at approachZ ABOVE the surface and still end at textDepth below it, the label is engraved with strokeCuttingZ = -approachZ and depth = textDepth + approachZ. strokeRapidZ (rapid moves between the strokes) is retractZ. @
-program CutLabel (
-    item:ScaleLabel
-        @doc: The label to engrave.@
-    heights:EngraveHeights
-        @doc: Clearance height for the moves between engravings.@
-    )
-    alignment = HorizontalAlignment.Center
-    if item.alignment == LabelAlignment.Left
-        alignment = HorizontalAlignment.Left
+        major = NewTickStyle(tickLength=tickLength tickDepth=depth)
+        medium = NewTickStyle(tickLength=tickLength * factor tickDepth=depth)
+        minor = NewTickStyle(tickLength=tickLength * factor * factor tickDepth=depth)
+        division = NewScaleDivision(valueStart=valueStart valueEnd=valueEnd majorStep=majorStep minorDivisions=minorParts mediumEvery=mediumAt skipFirstTick=skipFirst skipLastTick=skipLast)
+        numberStyle = NewLabelSettings(labelHeight=labelHeight labelDepth=depth labelEvery=labelEvery skipFirstLabel=not numbers)
+        ruler = NewLinearScale(originX=X originY=Y scaleLength=length division=division majorTick=major minorTick=minor mediumTick=medium labelFormat=numberStyle rotationAngle=angle side=side baselineDepth=lineDepth)
+        EngraveLinearScale scale=ruler heights=heights
     endif
-    if item.alignment == LabelAlignment.Right
-        alignment = HorizontalAlignment.Right
+endprogram
+
+@doc: ![](images/header_EngraveDial.png)
+
+Engraves a dial (clock face, gauge, protractor) with one command. Mandatory: the centre (X, Y, Z) and the radius
+of the scale circle. The kind sets range, steps, sweep and number orientation; everything can be overridden.
+Example: EngraveDial X=60 Y=60 Z=0 radius=30 @
+export program EngraveDial (
+    X:number
+        @doc: X of the centre of the dial.@
+    Y:number
+        @doc: Y of the centre of the dial.@
+    Z:number
+        @doc: ![](images/referenceZ.png)
+
+Z of the surface of the part at the dial. All depths are measured from this height.@
+    radius:number
+        @doc: ![](images/radius.png)
+
+Radius of the scale circle in the unit of the control. The ticks start on this circle.@
+    optional kind:DialKind
+        @doc: Degrees, Percent, Gauge or Protractor. Default: Degrees.@
+    optional tickLength:number
+        @doc: ![](images/tickLength.png)
+
+Length of the longest tick. The others are derived with the factor. Default: 20 percent of the radius, at most 6 mm.@
+    optional factor:number
+        @doc: ![](images/tickStyles.png)
+
+Every finer tick level is this much as long as the level before it. Default: 0.7.@
+    optional depth:number
+        @doc: ![](images/depth.png)
+
+Engraving depth of ticks, line and numbers, measured from Z (positive = how deep). Default: 0.1 mm.@
+    optional labelHeight:number
+        @doc: ![](images/labelHeight.png)
+
+Height of the numbers. Default: half the tick length, at least 2.5 mm.@
+    optional numbers:boolean
+        @doc: false = no numbers, only ticks. Default: true.@
+    optional valueStart:number
+        @doc: The value at the start angle. Together with valueEnd this makes your own scale, for example a gauge from 20 to 80. Default: 0.@
+    optional valueEnd:number
+        @doc: The value at the end angle. The dial shows the values from valueStart to valueEnd over its sweep. Default: from the kind (360, 100, 100, 180).@
+    optional majorStep:number
+        @doc: ![](images/majorStep.png)
+
+Value distance between two long ticks (the ticks with a number). Default: from the kind (30, 10, 10, 10), or chosen by itself when you set valueEnd.@
+    optional startAngle:number
+        @doc: ![](images/startAngle.png)
+
+Angle of the first value in degrees: 0 = to the right, 90 = 12 o'clock, counter-clockwise. Default: from the kind.@
+    optional endAngle:number
+        @doc: ![](images/endAngle.png)
+
+Angle of the last value in degrees. Smaller than the start angle runs clockwise. Default: from the kind.@
+    optional inside:boolean
+        @doc: ![](images/side_negative.png)
+
+true = ticks and numbers inside the circle. Default: from the kind (only the protractor is inside).@
+    optional orientation:NumberOrientation
+        @doc: ![](images/orientation_tangential.png)
+
+How the numbers are turned: Tangential follows the circle, Radial runs along the radius, Horizontal is not turned.
+Default: from the kind.@
+    optional skipFirst:boolean
+        @doc: ![](images/skipFirstTick.png)
+
+Leave out the first tick and its number. Default: false.@
+    optional skipLast:boolean
+        @doc: ![](images/skipLastTick.png)
+
+Leave out the last tick and its number. Default: false.@
+    optional baseline:boolean
+        @doc: ![](images/baselineDepth.png)
+
+true = also engrave the circle line (arc). Default: true.@
+    optional infeedZ:number
+        @doc: ![](images/infeedZ.png)
+
+Maximum depth per cut. The depth divided by infeedZ gives the number of cuts; they alternate in direction without lifting the tool. Default: the depth (one cut).@
+    optional feedHeight:number
+        @doc: ![](images/feedHeight.png)
+
+Height above Z where the movement starts with the plunge feed. The tool gets there with PrePositioning, via the safe height set with SafeZHeightForWorkpiece. Default: 1 mm.@
+    )
+    mm = MillimetersPerUnit
+    if not kind hasvalue
+        kind = DialKind.Degrees
     endif
-    Rapid Z=heights.retractZ
-    Rapid X=item.x Y=item.y
-    StandardTextEngrave text=item.text charHeight=item.textHeight charWidth=item.textWidth depth=item.textDepth + heights.approachZ strokeRapidZ=heights.retractZ strokeCuttingZ=-heights.approachZ rotation=item.rotation textPosition=alignment
-endprogram
 
-@doc: Engraves a plan: baseline arcs, then all tick lines in scale order, then the labels.
-Pure motion: the caller selects the tool and sets Rpm, Feed and Spindle On before the call and
-Spindle Off after it. Plunges and cuts use the current Feed. The work coordinate system must have
-Z = 0 on the surface. @
-export program EngraveScalePlan (
-    plan:ScalePlan
-        @doc: The plan to engrave, from PlanLinearScale or PlanCircularScale.@
-    heights:EngraveHeights
-        @doc: Clearance and final retract heights, see NewEngraveHeights.@
-    )
-    Absolute
-    first = true
-    foreach arcItem in plan.arcs
-        if first
-            PrePositioning X=arcItem.arcCenterX + arcItem.arcRadius * Math::CosDeg(arcItem.arcStart) Y=arcItem.arcCenterY + arcItem.arcRadius * Math::SinDeg(arcItem.arcStart) Z=heights.retractZ
-            first = false
+    # the kind sets the defaults of range, steps, sweep, side and number orientation
+    kindEnd = 360
+    kindStep = 30
+    kindMinor = 6
+    kindMedium = 0
+    kindStart = 90
+    kindStop = -270
+    kindInside = false
+    kindOrientation = NumberOrientation.Tangential
+    kindNumberEvery = 1
+    if kind == DialKind.Percent
+        kindEnd = 100
+        kindStep = 10
+        kindMinor = 5
+    endif
+    if kind == DialKind.Gauge
+        kindEnd = 100
+        kindStep = 10
+        kindMinor = 5
+        kindStart = 225
+        kindStop = -45
+        kindNumberEvery = 2
+    endif
+    if kind == DialKind.Protractor
+        kindEnd = 180
+        kindStep = 10
+        kindMinor = 10
+        kindMedium = 5
+        kindStart = 180
+        kindStop = 0
+        kindInside = true
+        kindOrientation = NumberOrientation.Horizontal
+        kindNumberEvery = 2
+    endif
+
+    if not valueStart hasvalue
+        valueStart = 0
+    endif
+    customRange = valueEnd hasvalue
+    if not valueEnd hasvalue
+        valueEnd = kindEnd
+    endif
+    if not majorStep hasvalue
+        majorStep = kindStep
+        if customRange
+            majorStep = NiceMajorStep(span=valueEnd - valueStart)
+            kindMinor = NiceMinorDivisions(distance=majorStep)
+            kindMedium = 0
+            if kindMinor == 4
+                kindMedium = 2
+            endif
         endif
-        CutArc arcSeg=arcItem heights=heights
-    endforeach
-    foreach lineItem in plan.lines
-        if first
-            PrePositioning X=lineItem.x1 Y=lineItem.y1 Z=heights.retractZ
-            first = false
+    endif
+    if not startAngle hasvalue
+        startAngle = kindStart
+    endif
+    if not endAngle hasvalue
+        endAngle = kindStop
+        # a full circle keeps running one turn clockwise when only the start angle is moved
+        if startAngle <> kindStart and kindStop == kindStart - 360
+            endAngle = startAngle - 360
         endif
-        CutLine lineSeg=lineItem heights=heights
-    endforeach
-    foreach labelItem in plan.labels
-        if first
-            PrePositioning X=labelItem.x Y=labelItem.y Z=heights.retractZ
-            first = false
-        endif
-        CutLabel item=labelItem heights=heights
-    endforeach
-    Rapid Z=heights.safeZ
-endprogram
+    endif
+    if not inside hasvalue
+        inside = kindInside
+    endif
+    if not orientation hasvalue
+        orientation = kindOrientation
+    endif
+    if not tickLength hasvalue
+        tickLength = Math::Min(6, radius * mm * 0.2) / mm
+    endif
+    if not factor hasvalue
+        factor = 0.7
+    endif
+    if not depth hasvalue
+        depth = 0.1 / mm
+    endif
+    if not labelHeight hasvalue
+        labelHeight = Math::Max(2.5, tickLength * mm * 0.5) / mm
+    endif
+    if not numbers hasvalue
+        numbers = true
+    endif
+    if not skipFirst hasvalue
+        skipFirst = false
+    endif
+    if not skipLast hasvalue
+        skipLast = false
+    endif
+    if not baseline hasvalue
+        baseline = true
+    endif
+    if not infeedZ hasvalue
+        infeedZ = 0
+    endif
+    if not feedHeight hasvalue
+        feedHeight = 1 / mm
+    endif
 
-@doc: Plans and engraves a linear scale (ruler). The caller sets tool, Rpm, Feed and Spindle On first. @
-export program EngraveLinearScale (
-    scale:LinearScale
-        @doc: The linear scale, see NewLinearScale.@
-    heights:EngraveHeights
-        @doc: Clearance and final retract heights, see NewEngraveHeights.@
-    )
-    plan = PlanLinearScale(scale=scale)
-    EngraveScalePlan plan=plan heights=heights
-endprogram
+    heights = NewEngraveHeights(referenceZ=Z feedHeight=feedHeight infeedZ=infeedZ)
+    side = TickSide.Positive
+    if inside
+        side = TickSide.Negative
+    endif
+    lineDepth = 0
+    if baseline
+        lineDepth = depth
+    endif
+    coreOrientation = LabelOrientation.Tangential
+    if orientation == NumberOrientation.Radial
+        coreOrientation = LabelOrientation.Radial
+    endif
+    if orientation == NumberOrientation.Horizontal
+        coreOrientation = LabelOrientation.Horizontal
+    endif
+    labelEvery = kindNumberEvery
+    if not numbers
+        labelEvery = 1000000
+    endif
 
-@doc: Plans and engraves a circular scale (dial). The caller sets tool, Rpm, Feed and Spindle On first. @
-export program EngraveCircularScale (
-    scale:CircularScale
-        @doc: The circular scale, see NewCircularScale.@
-    heights:EngraveHeights
-        @doc: Clearance and final retract heights, see NewEngraveHeights.@
-    )
-    plan = PlanCircularScale(scale=scale)
-    EngraveScalePlan plan=plan heights=heights
-endprogram
-
-@doc: Plans and engraves a fraction scale (inch ruler). The caller sets tool, Rpm, Feed and Spindle On first and Spindle Off afterwards. @
-export program EngraveFractionScale (
-    scale:FractionScale
-        @doc: The fraction scale, see NewFractionScale.@
-    heights:EngraveHeights
-        @doc: Clearance and final retract heights, see NewEngraveHeights.@
-    )
-    plan = PlanFractionScale(scale=scale)
-    EngraveScalePlan plan=plan heights=heights
+    major = NewTickStyle(tickLength=tickLength tickDepth=depth)
+    medium = NewTickStyle(tickLength=tickLength * factor tickDepth=depth)
+    minor = NewTickStyle(tickLength=tickLength * factor * factor tickDepth=depth)
+    division = NewScaleDivision(valueStart=valueStart valueEnd=valueEnd majorStep=majorStep minorDivisions=kindMinor mediumEvery=kindMedium skipFirstTick=skipFirst skipLastTick=skipLast)
+    numberStyle = NewLabelSettings(labelHeight=labelHeight labelDepth=depth labelEvery=labelEvery skipFirstLabel=not numbers)
+    dial = NewCircularScale(centerX=X centerY=Y radius=radius division=division majorTick=major minorTick=minor mediumTick=medium labelFormat=numberStyle startAngle=startAngle endAngle=endAngle side=side orientation=coreOrientation baselineDepth=lineDepth)
+    EngraveCircularScale scale=dial heights=heights
 endprogram
 
 end

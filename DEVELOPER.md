@@ -3,17 +3,18 @@
 Not part of the package (the package only contains `Library/`, `Samples/` and `Tests/`, see
 `metadata.json`). The end-user documentation is `README.md`, the store page `Installer/store/description.md`.
 
-**Shape:** pure simPL, no C# service. The planning is plain data, so a preview and a web API can be
-added later without touching the engraving code.
+**Shape:** pure simPL, no C# service. Two library modules: `ScaleEngraver` is the public surface with two commands,
+`ScaleEngraverCore` is the engine (parameter structures, geometry as data). Users only see the commands.
 
 ## Layout
 
 | Path | Content |
 |------|---------|
-| `Library/ScaleEngraver/ScaleEngraver.simpl` | the library: parameter structures, planning layer, engraving layer |
+| `Library/ScaleEngraver/ScaleEngraver.simpl` | the public commands `EngraveRuler` and `EngraveDial`: defaults, units, kinds |
+| `Library/ScaleEngraver/ScaleEngraverCore.simpl` | the engine: parameter structures, planning layer (geometry as data), engraving layer |
 | `Library/ScaleEngraver/images/` | parameter icons used in the `@doc` texts (`README.md` there lists them) |
 | `Samples/ScaleEngraver/` | the dialog app and the commented samples |
-| `Tests/ScaleEngraver/ScaleEngraverTest.simpl` | checks of the planning layer (no machine motion) |
+| `Tests/ScaleEngraver/ScaleEngraverTest.simpl` | checks of the core's planning layer (no machine motion) |
 | `Installer/store/` | store listing: `description.md`, `logo.png` (= `Store.Image`, the tile logo) |
 | `docs/` | README graphics, `docs/tiles/` (tile-style icons and the app logo, `gen_tiles.py`), `gen_graphics.py` and `render.ps1` to regenerate them |
 | `.agents/`, `.claude/`, `AGENTS.md`, `CLAUDE.md` | simPL skill, deployed by `simpl-skill install` |
@@ -22,31 +23,39 @@ added later without touching the engraving code.
 
 ![Parameters, plan, engrave](docs/workflow.png)
 
-* **Planning** (`PlanLinearScale`, `PlanCircularScale`) is a pure function: no machine command. The
-  result `ScalePlan` holds `lines` (ticks, baseline), `arcs` (circular baseline) and `labels`
-  (text, position, rotation, size, depth). It can be serialised with `System::ValueToJson`, drawn as
-  a preview or returned by a service.
-* **Engraving** (`EngraveScalePlan`; `EngraveLinearScale` / `EngraveCircularScale` plan and engrave in
-  one call) is pure motion: the **calling program** selects the tool and sets `Rpm`, `Feed` and
-  `Spindle On/Off`. Plunges and cuts use the current `Feed`.
-* **User interface** is separate (`ScaleEngraverApp`). Another front end only has to build the same
-  structures and call the library.
-
+* **Commands** (module `ScaleEngraver`): `EngraveRuler` and `EngraveDial` take position and size and
+  fill every other setting from defaults, then call the core. There is no plan to hand around and no
+  executor to call: one command, one scale.
+* **Defaults** are defined once in millimetres and divided by the millimetres per unit of the control
+  (`AxisSystem::MeasuringSystem`: 1 or 25.4), so the same call works on a metric and on an inch control:
+  tick 6 mm, factor 0.7, depth 0.1 mm, number height = half the tick (at least 2.5 mm), feed height 1 mm. The dial tick is 20 percent of the radius (at most 6 mm).
+* **Tick lengths:** one length (the longest tick) and one factor. Level L is `tickLength x factor^L`:
+  millimetre/centimetre ruler levels 0-2 (10 / 5 / 1 mm), inch ruler levels 0-`levels` (1, 1/2, 1/4 ...).
+* **Kinds** (`ScaleKind`, `DialKind`) bundle range, steps, sweep, side and number orientation; every
+  value can be overridden.
+* **Core** (module `ScaleEngraverCore`): parameter structures, `Plan...Scale` returns a `ScalePlan`
+  (lines, arcs, labels as data), `EngraveScalePlan` turns it into motion. Pure motion: the **calling
+  program** selects the tool and sets `Rpm`, `SafeZHeightForWorkpiece`, `SetFeedTechnology plunge= finishing=` and `Spindle On/Off`. The plan layer is kept for
+  the tests and for a later preview / web API; it is not part of the user surface.
 ### Move sequence
 
 ![Move sequence of one tick](docs/move_sequence.png)
 
-For every tick, baseline and arc: up to `retractZ`, rapid over the start, rapid down to `approachZ`,
-feed down to the depth, cut horizontally, up again. No connecting move at depth (measured in the
-debugger: Z 0.5, -0.2, -0.2, 2 for one tick). Text is engraved with `StandardTextEngrave`, which
-brings its own approach. It takes a positive `depth`, and `strokeCuttingZ` counts like the depth
-(final cut at `-(strokeCuttingZ + depth)`), so the library passes `strokeCuttingZ = -approachZ` and
-`depth = textDepth + approachZ`; `strokeRapidZ` is `retractZ`.
+For every tick, baseline and arc: `PrePositioning X Y Z` (the control moves up to the `SafeZHeightForWorkpiece`, over the start and
+down to `Z + feedHeight`), plunge feed to `Z - depth` (`Feed technology=Plunge`, in cuts of `infeedZ`; the cuts alternate in
+direction), finishing feed along the line (`Feed technology=Finishing`). No connecting move at the surface. The last element
+ends with `PrePositioning Z=SafeZHeightForWorkpiece`.
 
-## Parameters (structures)
+Text is engraved with `StandardTextEngrave`. It counts from the position it starts at and treats that position as the rapid
+level (`strokeRapidZ`) above the surface, so a label is positioned at `Z + strokeRapidZ` first (observed: starting at `Z` = 10 the
+text ended 2.1 mm deep instead of 0.1, exactly `strokeRapidZ` too deep). `strokeRapidZ` is twice the feed height. The command takes a
+positive `depth`, and `strokeCuttingZ` counts like the depth (final cut at `-(strokeCuttingZ + depth)` below the surface), so the library
+passes `strokeCuttingZ = -feedHeight` and `depth = textDepth + feedHeight`.
+
+## Parameters (core structures)
 
 All lengths in mm, angles in degrees (0 = +X, counter-clockwise). Depths are **positive numbers =
-how deep below the surface** (Z = 0 on the surface); the library converts them (`Z = -depth`).
+how deep below the surface** (measured from `Z`, the height of the surface); the library converts them (`Z - depth`).
 Every structure has a `New...` constructor with defaults for optional values; the `@doc` texts
 describe every parameter.
 
@@ -58,7 +67,7 @@ describe every parameter.
 | `LinearScale` | `originX/Y`, `scaleLength`, `rotationAngle`, `side`, `majorTick`, `minorTick`, `mediumTick`, `labelFormat`, `baselineDepth` |
 | `CircularScale` | `centerX/Y`, `radius`, `startAngle`, `endAngle`, `side`, `majorTick`, `minorTick`, `mediumTick`, `labelFormat`, `orientation`, `baselineDepth` |
 | `FractionScale` (inch ruler) | `originX/Y`, `scaleLength`, `rotationAngle`, `valueStart`, `valueEnd`, `levels` (halvings), `tickStyles` (one per level), `unitLabel`, `fractionLabel`, `fractionLabelLevel`, `side`, `skipFirstTick`, `skipLastTick`, `baselineDepth` |
-| `EngraveHeights` | `retractZ`, `approachZ`, `safeZ` |
+| `EngraveHeights` | `referenceZ`, `feedHeight`, `infeedZ` |
 
 ## Development
 

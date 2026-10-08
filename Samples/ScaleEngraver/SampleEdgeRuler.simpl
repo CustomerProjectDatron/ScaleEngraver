@@ -4,65 +4,29 @@
 @ MeasuringSystem = "Metric" @
 @ WorkpieceGeometry :"MinEdge":{"X":0.0,"Y":0.0,"Z":-10.0},"MaxEdge":{"X":30.0,"Y":130.0,"Z":0.0}@
 
-# SAMPLE: a vertical ruler along the left edge of a part, ticks pointing into the part.
+# SAMPLE: a vertical centimetre ruler along the left edge of a part, ticks pointing into the part.
 #
-# What happens
-#   The part edge is the line X = 0, the part lies at X > 0. A 100 mm scale runs along +Y
-#   (rotationAngle=90). Ticks and labels are engraved on the part side.
+#   EngraveRuler X=0 Y=20 Z=0 length=100 kind=ScaleKind.Centimeter angle=90 below=true skipFirst=true
 #
-# Direction of a linear scale
-#   rotationAngle=0 runs along +X, 90 along +Y. TickSide.Positive is the LEFT-hand side of the
-#   running direction: for a scale along +Y that is the -X side (outside of our part). We want the
-#   ticks on the +X side, so we use TickSide.Negative.
+#   kind=Centimeter   same ticks as a millimetre ruler, the numbers are centimetres: 1, 2, 3 ... 10
+#   angle=90          the ruler runs upwards (+Y); 0 = to the right
+#   below=true        ticks and numbers on the right-hand side of the running direction, which is the
+#                     part side (+X) of the edge X = 0; the default is the left-hand side
+#   skipFirst=true    no tick and no number at 0, directly on the edge of the part
 #
-# Border handling
-#   The first value (0) lies exactly on the part edge and the last one (100) on the opposite end
-#   of the scale. skipFirstTick=true leaves out the tick AND the number at 0 - an engraved tick
-#   directly on the edge would break the edge. skipLastLabel=true keeps only the tick at 100 but
-#   drops its number, because the number would not fit in front of the part end.
-#   (skipFirstTick/skipLastTick remove tick and label, skipFirstLabel/skipLastLabel only the label.)
-#
-# Decimals
-#   The values run 0..10 (centimetres), a major tick every 1, a minor tick every 1 mm
-#   (minorDivisions=10). decimals=0 prints 1, 2, 3 ...; decimals=1 would print 1.0, 2.0, ...
-#
-# Calling program duties: tool, Rpm, Feed, Spindle On/Off. Z = 0 is the surface of the part.
+# The program selects the tool and sets Rpm, the feeds and the spindle. Z = 0 is the surface of the part.
 
 using Base
 using ScaleEngraver
 
 export program Main
     Absolute
+    SafeZHeightForWorkpiece = 15
     Rpm = 13000
-    Feed = 800
+    SetFeedTechnology plunge=200 finishing=800
     Spindle On
 
-    heights = NewEngraveHeights(retractZ=2 approachZ=0.5 safeZ=20)
-
-    majorTick = NewTickStyle(tickLength=8 tickDepth=0.2)
-    minorTick = NewTickStyle(tickLength=4 tickDepth=0.1)
-    mediumTick = NewTickStyle(tickLength=6 tickDepth=0.15)
-
-    # 0..10 cm, a major tick per cm, 10 minor intervals (mm) per cm, a medium tick every 5 mm
-    edgeDivision = NewScaleDivision(valueStart=0 valueEnd=10 majorStep=1 minorDivisions=10 mediumEvery=5 skipFirstTick=true)
-
-    # numbers 3 mm high, the last number (10) is left out
-    edgeLabels = NewLabelSettings(labelHeight=3 labelDepth=0.1 skipLastLabel=true)
-
-    edgeRuler = NewLinearScale(
-        originX=0
-        originY=20
-        scaleLength=100
-        division=edgeDivision
-        majorTick=majorTick
-        minorTick=minorTick
-        mediumTick=mediumTick
-        labelFormat=edgeLabels
-        rotationAngle=90
-        side=TickSide.Negative
-    )
-
-    EngraveLinearScale scale=edgeRuler heights=heights
+    EngraveRuler X=0 Y=20 Z=0 length=100 kind=ScaleKind.Centimeter angle=90 below=true skipFirst=true
 
     Spindle Off
     MoveToParkPosition

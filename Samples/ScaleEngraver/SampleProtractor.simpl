@@ -4,66 +4,29 @@
 @ MeasuringSystem = "Metric" @
 @ WorkpieceGeometry :"MinEdge":{"X":0.0,"Y":0.0,"Z":-10.0},"MaxEdge":{"X":120.0,"Y":70.0,"Z":0.0}@
 
-# SAMPLE: a half-circle protractor, 0..180 degrees, ticks and numbers INSIDE the arc.
+# SAMPLE: a half-circle protractor, 0 to 180 degrees, ticks and numbers inside the arc.
 #
-# What happens
-#   A circular scale of radius 50 mm around (60, 10). The arc runs over the top from the left
-#   (0 degrees) to the right (180 degrees): in the library's angle system (0 = +X, counter-
-#   clockwise) that is startAngle=180 and endAngle=0, i.e. a clockwise sweep of 180 degrees.
-#   The scale values are degrees too, so value 90 sits at the top of the arc.
+#   EngraveDial X=60 Y=10 Z=0 radius=50 kind=DialKind.Protractor
 #
-# Why these parameters
-#   side=Negative            ticks and labels are engraved INSIDE the circle (default: outside)
-#   orientation=Horizontal   the numbers are not rotated, so the whole protractor is readable
-#                            from one side (Tangential would turn them upside down on one half)
-#   mediumEvery=5            a medium tick every 5 degrees between the major ticks every 10
-#                            (minorDivisions=10 -> a minor tick every 1 degree)
-#   labelEvery=2             only every second major tick gets a number: 0, 20, 40, ..., 180
-#   baselineDepth=0.1        the arc itself is engraved too (cut in segments of at most 90 degrees)
+# The kind Protractor sets what a protractor needs: the range 0..180, a long tick every 10 degrees with
+# a number on every second one, a tick every degree, a medium tick every 5 degrees, the sweep over the top
+# from the left (0) to the right (180), ticks and numbers inside the circle, numbers not turned.
+# Every one of these can be overridden, for example  inside=false  puts the ticks outside.
 #
-# The bottom line of the protractor is not part of the scale; engrave it with your own Line
-# moves if you want it (the library only engraves what belongs to the scale).
-#
-# Calling program duties: tool, Rpm, Feed, Spindle On/Off. Z = 0 is the surface of the part.
+# The bottom line of the protractor is not part of the scale. The program selects the tool and sets Rpm,
+# the feeds and the spindle. Z = 0 is the surface of the part.
 
 using Base
 using ScaleEngraver
 
 export program Main
     Absolute
+    SafeZHeightForWorkpiece = 15
     Rpm = 13000
-    Feed = 800
+    SetFeedTechnology plunge=200 finishing=800
     Spindle On
 
-    heights = NewEngraveHeights(retractZ=2 approachZ=0.5 safeZ=20)
-
-    majorTick = NewTickStyle(tickLength=7 tickDepth=0.2)
-    mediumTick = NewTickStyle(tickLength=5 tickDepth=0.15)
-    minorTick = NewTickStyle(tickLength=3 tickDepth=0.1)
-
-    # values = degrees: 0..180, major tick every 10, a minor tick every degree, medium every 5
-    degreeDivision = NewScaleDivision(valueStart=0 valueEnd=180 majorStep=10 minorDivisions=10 mediumEvery=5)
-
-    # numbers every second major tick, 3 mm high; the gap to the tick end defaults to 0.3 x height
-    degreeLabels = NewLabelSettings(labelHeight=3 labelDepth=0.1 labelEvery=2)
-
-    protractor = NewCircularScale(
-        centerX=60
-        centerY=10
-        radius=50
-        division=degreeDivision
-        majorTick=majorTick
-        minorTick=minorTick
-        mediumTick=mediumTick
-        labelFormat=degreeLabels
-        startAngle=180
-        endAngle=0
-        side=TickSide.Negative
-        orientation=LabelOrientation.Horizontal
-        baselineDepth=0.1
-    )
-
-    EngraveCircularScale scale=protractor heights=heights
+    EngraveDial X=60 Y=10 Z=0 radius=50 kind=DialKind.Protractor
 
     Spindle Off
     MoveToParkPosition

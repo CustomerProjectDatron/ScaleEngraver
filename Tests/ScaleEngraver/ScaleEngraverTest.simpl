@@ -3,11 +3,11 @@
 @ Author = "Benjamin Boeck" @
 @ MeasuringSystem = "Metric" @
 
-# Tests of the planning layer of ScaleEngraver. No machine motion is executed: the plans are
+# Tests of the planning layer of ScaleEngraverCore (the engine behind EngraveRuler and EngraveDial). No machine motion is executed: the plans are
 # computed and checked as data. A failed check raises InvalidArgumentValue with a message.
 
 using Base
-using ScaleEngraver
+using ScaleEngraverCore
 import System
 import Math
 
@@ -124,6 +124,22 @@ export program Main
     partial = NewCircularScale(centerX=0 centerY=0 radius=40 division=partialDivision majorTick=majorTick minorTick=minorTick labelFormat=labels startAngle=225 endAngle=-45)
     partialPlan = PlanCircularScale(scale=partial)
     Expect condition=(sizeof partialPlan.lines == 31) message="circular: partial arc keeps both end ticks"
+
+    # Own value range: ticks sit on multiples of the step, the first tick is the first one inside the range
+    rangeDivision = NewScaleDivision(valueStart=15 valueEnd=85 majorStep=10 minorDivisions=10)
+    rangeScale = NewLinearScale(originX=0 originY=0 scaleLength=70 division=rangeDivision majorTick=majorTick minorTick=minorTick labelFormat=labels)
+    rangePlan = PlanLinearScale(scale=rangeScale)
+    Expect condition=(sizeof rangePlan.lines == 71) message="range: 15 to 85 has 71 ticks"
+    Expect condition=(sizeof rangePlan.labels == 7) message="range: numbers 20 to 80"
+    Expect condition=(rangePlan.labels[0].text == "20") message="range: first number is 20"
+    Expect condition=IsClose(actual=rangePlan.labels[0].x expected=5) message="range: 20 sits 5 mm from the start"
+    negativeDivision = NewScaleDivision(valueStart=-50 valueEnd=50 majorStep=10 minorDivisions=10)
+    negativeScale = NewLinearScale(originX=0 originY=0 scaleLength=100 division=negativeDivision majorTick=majorTick minorTick=minorTick labelFormat=labels)
+    negativePlan = PlanLinearScale(scale=negativeScale)
+    Expect condition=(sizeof negativePlan.labels == 11) message="range: -50 to 50 has 11 numbers"
+    Expect condition=(negativePlan.labels[0].text == "-50") message="range: first number is -50"
+    Expect condition=(negativePlan.labels[5].text == "0") message="range: zero in the middle"
+    Expect condition=IsClose(actual=negativePlan.labels[5].x expected=50) message="range: zero sits in the middle"
 endprogram
 
 end

@@ -2,7 +2,6 @@
 
 | Icon | File | Parameter |
 |---|---|---|
-| ![](images/approachZ.png) | approachZ.png / .svg | approachZ |
 | ![](images/baselineDepth.png) | baselineDepth.png / .svg | baselineDepth |
 | ![](images/depth.png) | depth.png / .svg | labelDepth, lineDepth, arcDepth, textDepth |
 | ![](images/endAngle.png) | endAngle.png / .svg | endAngle |
@@ -21,9 +20,10 @@
 | ![](images/orientation_radial.png) | orientation_radial.png / .svg | orientation |
 | ![](images/orientation_tangential.png) | orientation_tangential.png / .svg | orientation |
 | ![](images/radius.png) | radius.png / .svg | radius |
-| ![](images/retractZ.png) | retractZ.png / .svg | retractZ |
+| ![](images/referenceZ.png) | referenceZ.png / .svg | referenceZ, Z |
+| ![](images/feedHeight.png) | feedHeight.png / .svg | feedHeight |
+| ![](images/infeedZ.png) | infeedZ.png / .svg | infeedZ |
 | ![](images/rotationAngle.png) | rotationAngle.png / .svg | rotationAngle |
-| ![](images/safeZ.png) | safeZ.png / .svg | safeZ |
 | ![](images/scaleLength.png) | scaleLength.png / .svg | scaleLength |
 | ![](images/side_negative.png) | side_negative.png / .svg | side |
 | ![](images/side_positive.png) | side_positive.png / .svg | side |

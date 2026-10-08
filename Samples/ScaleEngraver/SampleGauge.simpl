@@ -6,72 +6,27 @@
 
 # SAMPLE: a gauge face (pressure, temperature, level ...) with a 270 degree scale 0..100.
 #
-# What happens
-#   A dial of radius 30 mm around (50, 50). The pointer sweep starts at 7:30 o'clock (225 degrees)
-#   and runs CLOCKWISE over the top to 4:30 o'clock (-45 degrees): endAngle < startAngle means
-#   clockwise, the sweep is 270 degrees, the scale values 0..100 are spread evenly over it.
+#   EngraveDial X=50 Y=50 Z=0 radius=30 kind=DialKind.Gauge
 #
-# What you can learn here
-#   - a partial circle keeps BOTH end ticks (only a closed 360 degree scale drops the closing one)
-#   - labelEvery=2   numbers at 0, 20, 40, ... 100 although there is a major tick every 10
-#   - decimals=0     numbers are rounded to whole numbers (try decimals=1 for 20.0)
-#   - the scale arc is engraved (baselineDepth) and the numbers follow the circle (Tangential)
-#   - a second, short scale in the same program: the "red zone" 80..100 engraved deeper and with
-#     longer ticks, simply as another circular scale on the same circle
+# The kind Gauge runs from the lower left (7:30 o'clock) clockwise over the top to the lower right
+# (4:30), values 0..100, a long tick every 10, a number on every second one. Change the values with
+#   valueEnd=60 majorStep=10      a 0..60 gauge with a long tick every 10
+#   valueStart=20 valueEnd=80     your own scale: the same sweep shows 20 to 80
+# and the sweep with startAngle= / endAngle= (an end angle smaller than the start angle runs clockwise).
 #
-# Calling program duties: tool, Rpm, Feed, Spindle On/Off. Z = 0 is the surface of the part.
+# The program selects the tool and sets Rpm, the feeds and the spindle. Z = 0 is the surface of the part.
 
 using Base
 using ScaleEngraver
 
 export program Main
     Absolute
+    SafeZHeightForWorkpiece = 15
     Rpm = 13000
-    Feed = 800
+    SetFeedTechnology plunge=200 finishing=800
     Spindle On
 
-    heights = NewEngraveHeights(retractZ=2 approachZ=0.5 safeZ=20)
-
-    # --- main scale 0..100 over 270 degrees ----------------------------------------------------
-    majorTick = NewTickStyle(tickLength=5 tickDepth=0.2)
-    minorTick = NewTickStyle(tickLength=2.5 tickDepth=0.1)
-    gaugeDivision = NewScaleDivision(valueStart=0 valueEnd=100 majorStep=10 minorDivisions=5)
-    gaugeLabels = NewLabelSettings(labelHeight=3 labelDepth=0.1 labelEvery=2)
-
-    gauge = NewCircularScale(
-        centerX=50
-        centerY=50
-        radius=30
-        division=gaugeDivision
-        majorTick=majorTick
-        minorTick=minorTick
-        labelFormat=gaugeLabels
-        startAngle=225
-        endAngle=-45
-        baselineDepth=0.1
-    )
-    EngraveCircularScale scale=gauge heights=heights
-
-    # --- "red zone" 80..100: the same circle, only the last 20 percent of the sweep ------------
-    # 80 percent of 270 degrees from the start: 225 - 0.8 * 270 = 9 degrees. The values keep their
-    # meaning because valueStart/valueEnd of this second scale are 80 and 100.
-    zoneTick = NewTickStyle(tickLength=8 tickDepth=0.3)
-    zoneDivision = NewScaleDivision(valueStart=80 valueEnd=100 majorStep=10 minorDivisions=5 skipFirstTick=true)
-    zoneLabels = NewLabelSettings(labelHeight=3 labelDepth=0.1 skipFirstLabel=true skipLastLabel=true)
-
-    zone = NewCircularScale(
-        centerX=50
-        centerY=50
-        radius=30
-        division=zoneDivision
-        majorTick=zoneTick
-        minorTick=zoneTick
-        labelFormat=zoneLabels
-        startAngle=9
-        endAngle=-45
-        baselineDepth=0.3
-    )
-    EngraveCircularScale scale=zone heights=heights
+    EngraveDial X=50 Y=50 Z=0 radius=30 kind=DialKind.Gauge
 
     Spindle Off
     MoveToParkPosition

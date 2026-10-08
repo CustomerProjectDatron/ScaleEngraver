@@ -4,60 +4,37 @@
 @ MeasuringSystem = "Metric" @
 @ WorkpieceGeometry :"MinEdge":{"X":0.0,"Y":0.0,"Z":-10.0},"MaxEdge":{"X":120.0,"Y":100.0,"Z":0.0}@
 
-# Engraves a 100 mm ruler and a 360 degree dial with fixed values. Work coordinate system:
-# X/Y on the part, Z = 0 on the surface. The tool in the spindle is used.
+# SAMPLE: the smallest example - a 100 mm ruler and a dial, one command each.
 #
-# The library only generates the engraving motion. Spindle speed, feed and spindle on/off are set
-# here, in the calling program (plunges and cuts both use the current Feed). Depths are positive
-# values: how deep below the surface.
+#   EngraveRuler X=10 Y=10 Z=0 length=100      a millimetre ruler: tick every 1 mm, medium every 5 mm,
+#                                          long tick with a number every 10 mm
+#   EngraveDial  X=60 Y=60 Z=0 radius=28       a dial 0..360 degrees: number every 30, tick every 5 degrees
+#
+# Everything else has a default: tick length 6 mm (all other ticks are shorter by a factor of 0.7 per level),
+# numbers half as high as the longest tick, depth 0.1 mm, line along the ticks. Add parameters only
+# where you want something different, for example  tickLength=8  or  depth=0.15.
+#
+# The program selects the tool and sets Rpm, the feeds and the spindle; the library only engraves.
+# Like in the milling cycles:
+#   SafeZHeightForWorkpiece   the height the tool retracts to between two engravings (PrePositioning)
+#   SetFeedTechnology         plunge = the move into the material, finishing = the cut along the tick or line
+#   Z=0                       the height of the surface of the part; every depth is measured from it
+#   feedHeight=1              (default) the height above Z where the plunge feed starts
+#   infeedZ                   (default = the depth) maximum depth per cut, for example
+#     EngraveRuler X=10 Y=10 Z=0 length=100 depth=0.3 infeedZ=0.1     three cuts of 0.1 mm
 
 using Base
 using ScaleEngraver
 
 export program Main
     Absolute
+    SafeZHeightForWorkpiece = 15
     Rpm = 13000
-    Feed = 1000
+    SetFeedTechnology plunge=250 finishing=1000
     Spindle On
 
-    heights = NewEngraveHeights(retractZ=2 approachZ=0.5 safeZ=20)
-    majorTick = NewTickStyle(tickLength=6 tickDepth=0.2)
-    minorTick = NewTickStyle(tickLength=3 tickDepth=0.1)
-    mediumTick = NewTickStyle(tickLength=4.5 tickDepth=0.15)
-
-    # Ruler 0..100 mm along +X, ticks upwards, the "0" on the part edge is not labelled
-    rulerDivision = NewScaleDivision(valueStart=0 valueEnd=100 majorStep=10 minorDivisions=10 mediumEvery=5)
-    rulerLabels = NewLabelSettings(labelHeight=3 labelDepth=0.1)
-    ruler = NewLinearScale(
-        originX=10
-        originY=10
-        scaleLength=100
-        division=rulerDivision
-        majorTick=majorTick
-        minorTick=minorTick
-        mediumTick=mediumTick
-        labelFormat=rulerLabels
-        #        baselineDepth=0.1
-
-    )
-    EngraveLinearScale scale=ruler heights=heights
-
-    # Dial 0..360 degrees, clockwise from 12 o'clock, labels follow the circle
-    dialDivision = NewScaleDivision(valueStart=0 valueEnd=120 majorStep=30 minorDivisions=6)
-    dialLabels = NewLabelSettings(labelHeight=3 labelDepth=0.1)
-    dial = NewCircularScale(
-        centerX=50 + 10
-        centerY=30
-        radius=30
-        division=dialDivision
-        majorTick=majorTick
-        minorTick=minorTick
-        labelFormat=dialLabels
-        startAngle=30
-        endAngle=150
-        baselineDepth=0.1
-    )
-    EngraveCircularScale scale=dial heights=heights
+    EngraveRuler X=10 Y=10 Z=0 length=100
+    EngraveDial X=60 Y=60 Z=0 radius=28
 
     Spindle Off
     MoveToParkPosition

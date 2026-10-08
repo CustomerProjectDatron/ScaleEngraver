@@ -2,97 +2,105 @@
 
 # Scale Engraver
 
-Engrave **rulers, dials, gauges and protractors** on your part. You describe the scale - what it
-shows, where it sits, how long the ticks are - and Scale Engraver engraves every tick and number.
+Engrave **rulers and dials** on your part with **one command each**. You say where the scale goes and how
+big it is - the ticks, the numbers, the depth and the heights come from sensible defaults.
+
+```
+EngraveRuler X=10 Y=10 Z=0 length=100
+EngraveDial  X=60 Y=60 Z=0 radius=28
+```
 
 ![Ruler](Library/ScaleEngraver/images/readme/hero_ruler.png)
 
-## What you can do
+## The commands
 
-- Straight scales in any direction, with the ticks on either side of the line
-- Circular scales: a full dial, a gauge with a partial sweep, a protractor - clockwise or counter-clockwise
-- Three tick classes - **major**, **medium**, **minor** - each with its own length and depth
-- Numbers beside the major ticks: size, decimals, distance to the tick, every n-th number only
-- A real inch ruler: whole inches, halves, quarters, eighths, sixteenths - every level with its own tick length, big numbers for the inches and small fractions (1/2, 1/4, 3/4) beside the longer ticks
-- Numbers written as fractions (1/8, 1/4, 3/8, 1 1/2 ...) on any scale - or with any other denominator
-- Leave out the first or last tick, or only its number - for example where the scale ends on the edge of the part
-- Numbers on circular scales that follow the circle, run along the radius or stay horizontal
-- Engrave the scale line or arc itself
+**EngraveRuler** - a straight scale
 
-| | |
-|---|---|
-| ![Dial](Library/ScaleEngraver/images/readme/hero_dial.png) | ![Protractor](Library/ScaleEngraver/images/readme/protractor.png) |
+| Setting | Meaning | Default |
+|---------|---------|---------|
+| `X`, `Y`, `Z`, `length` | where the ruler starts (Z = height of the surface) and how long it is | required |
+| `kind` | `Millimeter`, `Centimeter` (numbers in cm) or `Inch` (halves, quarters ... sixteenths) | Millimeter; Inch on an inch control |
+| `valueStart`, `valueEnd` | your own scale: the values at the start and at the end of the ruler, e.g. 20 to 70 or -50 to 50 | 0 to the length |
+| `majorStep` | value distance between two numbered ticks | 10 (mm), 1 (cm, inch); automatic for your own range |
+| `angle` | direction: 0 = to the right, 90 = upwards | 0 |
+| `below` | ticks and numbers on the other side of the line | false |
+| `skipFirst`, `skipLast` | leave out the first / last tick with its number (part edge) | false |
+| `numbers` | false = ticks only | true |
+| `levels`, `fractionLevel` | inch ruler: halve down to 1/16 (4) or 1/32 (5); fractions get numbers down to quarters (2) | 4, 2 |
 
-## How to use it
+**EngraveDial** - a circular scale
 
-Start the sample **ScaleEngraverApp** and answer the dialogs:
+| Setting | Meaning | Default |
+|---------|---------|---------|
+| `X`, `Y`, `Z`, `radius` | centre (Z = height of the surface) and radius of the scale circle | required |
+| `kind` | `Degrees` (0-360), `Percent` (0-100), `Gauge` (0-100 over 270 degrees), `Protractor` (0-180, inside) | Degrees |
+| `valueStart`, `valueEnd` | your own scale: the values at the start and at the end angle, e.g. a gauge from 20 to 80 | 0 to the kind's end |
+| `majorStep` | distance between long ticks | from the kind; automatic for your own range |
+| `startAngle`, `endAngle` | where the scale starts and ends (0 = right, 90 = 12 o'clock, smaller end angle = clockwise) | from the kind |
+| `inside`, `orientation` | ticks inside the circle; numbers `Tangential`, `Radial` or `Horizontal` | from the kind |
+| `skipFirst`, `skipLast`, `numbers` | as for the ruler | false, false, true |
 
-1. Scale type - straight or circular
-2. Tool, spindle speed, feed and heights
-3. Values: first and last value, a major tick every n, minor ticks in between, medium ticks
-4. Tick lengths and depths, number size, position and size of the scale
+Both commands also take the settings below.
 
-The scale is then engraved. The coordinate system must have Z = 0 on the surface of the part.
+| Setting | Meaning | Default |
+|---------|---------|---------|
+| `tickLength` | length of the **longest** tick | 6 mm (dial: 20 % of the radius, at most 6 mm) |
+| `factor` | every finer tick level is this much as long as the level before | 0.7 |
+| `labelHeight` | height of the numbers | half the tick length, at least 2.5 mm |
+| `baseline` | also engrave the line along the ticks | true |
+| `depth` | engraving depth, measured from `Z` | 0.1 mm |
+| `feedHeight` | height above `Z` where the movement starts with the plunge feed | 1 mm |
+| `infeedZ` | maximum depth per cut; the depth divided by it gives the number of cuts, which alternate in direction without lifting | the depth (one cut) |
 
-To engrave a scale from your own program, copy the sample that is closest to what you need.
-Every sample is commented step by step.
+The defaults are given in millimetres and are converted by themselves when the control is set to inch.
+Select the tool and set `Rpm` and `Spindle On` in your program before the command, plus the retract height and the feeds like for the DATRON cycles:
+
+```
+SafeZHeightForWorkpiece = 15
+SetFeedTechnology plunge=200 finishing=800
+```
+
+`Z` is the height of the surface; every depth is measured from it. Every engraving starts with `PrePositioning`: the tool moves up to the safe height set with `SafeZHeightForWorkpiece`, over the start and down to the feed height. `plunge` is the feed for the move into the material, `finishing` the feed for the cut along every tick, line and arc.
+
+## One length and one factor
+
+You define **one** tick length - the longest tick - and every finer level is a fixed fraction of the one before.
+With the default factor 0.7:
+
+| Level | Millimetre ruler | Inch ruler | Length |
+|-------|------------------|------------|--------|
+| 0 | every 10 mm (with number) | every inch (big number) | 100 % = `tickLength` |
+| 1 | every 5 mm | 1/2 inch (small number) | 70 % |
+| 2 | every 1 mm | 1/4 inch (small number) | 49 % |
+| 3 | | 1/8 inch | 34 % |
+| 4 | | 1/16 inch | 24 % |
+
+Change the `tickLength` and the whole ruler scales with it; change the `factor` (for example 0.6) for a stronger
+step between the levels. The numbers follow the tick length, too.
+
+![Dial](Library/ScaleEngraver/images/readme/hero_dial.png)
 
 ## Samples
 
+Every sample is only a few lines and commented; copy the one that is closest to your part.
+
 | Sample | Engraves |
 |--------|----------|
-| `ScaleEngraverApp` | any scale, asks for everything in dialogs |
-| `ScaleEngraverSample` | a 100 mm ruler and a dial segment - the smallest example |
-| `SampleInchRuler` | a real 6 inch ruler programmed completely in inch: five tick levels (inch to 1/16), big numbers and small fractions |
+| `ScaleEngraverApp` | any scale, asks for everything in two dialogs |
+| `ScaleEngraverSample` | a 100 mm ruler and a dial - the smallest example |
+| `SampleInchRuler` | an inch ruler (inch, 1/2, 1/4, 1/8, 1/16), programmed completely in inch |
 | `SampleProtractor` | a half circle 0 to 180 degrees, ticks and numbers inside |
-| `SampleGauge` | a 270 degree gauge 0 to 100 with a marked "red zone" |
-| `SampleEdgeRuler` | a vertical ruler along a part edge; the tick on the edge is left out |
-| `SampleDialVariants` | three dials side by side: numbers following the circle, along the radius, horizontal |
-| `SamplePlanOnly` | shows what will be engraved, asks, changes it and engraves |
+| `SampleGauge` | a 270 degree gauge 0 to 100 |
+| `SampleCustomScale` | your own scales: a ruler from 20 to 70, one from -50 to 50, a gauge from 20 to 80 |
+| `SampleEdgeRuler` | a vertical centimetre ruler along a part edge; the tick on the edge is left out |
+| `SampleDialVariants` | three dials: numbers following the circle, along the radius, horizontal |
 
-## The settings
+![Protractor](Library/ScaleEngraver/images/readme/protractor.png)
 
-All lengths in mm, angles in degrees (0 = right, counter-clockwise). **Depths are positive
-numbers: how deep the engraving goes below the surface**, for example 0.2.
+## Good to know
 
-| Setting | Meaning |
-|---------|---------|
-| First / last value | what the scale shows, for example 0 to 100 or 0 to 360 |
-| Major tick every | value step between two major ticks |
-| Minor ticks per major | how many small intervals lie between two major ticks (10 gives nine minor ticks) |
-| Medium tick every | every n-th minor interval gets a medium tick, for example 5 for a tick halfway between two major ticks; 0 = none |
-| Tick length / depth | separately for major, medium and minor ticks |
-| Skip first / last tick | leaves out the tick **and** its number |
-| Number size, width, depth | size of the engraved numbers |
-| Distance number to tick | gap between the end of the major tick and the number |
-| Decimals | decimal places of the numbers |
-| Fractions | 0 = decimal numbers; 2, 4, 8, 16 write the numbers as halves, quarters, eighths, sixteenths (1/8, 1/4, 3/8, 1 1/2 ...), 10 as tenths |
-| Number every | 1 = every major tick gets a number, 2 = every second one, ... |
-| Skip first / last number | leaves out only the number |
-| Scale length, direction | straight scale: how long, and the angle (0 = to the right, 90 = upwards) |
-| Side | which side of the line (or inside / outside of the circle) ticks and numbers are engraved |
-| Centre, radius, start / end angle | circular scale; an end angle smaller than the start angle runs clockwise |
-| Number orientation | circular scale: following the circle, along the radius, or horizontal |
-| Line depth | depth of the scale line or arc itself; 0 = not engraved |
-| Retract height | height of the moves between two engravings |
-| Approach height | height just above the surface where the feed move into the material starts |
-| Safe height | height after the last engraving |
-
-Inch ruler (fraction scale)
-
-| Setting | Meaning |
-|---------|---------|
-| Levels | how often the inch is halved: 4 = down to sixteenths, 5 = thirty-seconds |
-| Longest tick length / depth | the whole inches; every finer level gets a shorter and shallower tick |
-| Inch numbers | size and position of the numbers 1, 2, 3 ... |
-| Fraction numbers | size of the fractions (1/2, 1/4, 3/4); by default 60 percent of the inch numbers |
-| Fractions down to | 0 = none, 1 = halves, 2 = also quarters, 3 = also eighths |
-
-Good to know
-
-- Numbers sit beyond the end of the major tick. Where tick classes coincide, the stronger one is engraved
-  (major before medium before minor), never two.
+- Where tick levels coincide, the longer tick is engraved, never two.
 - A full 360 degree scale engraves the tick at the start only once.
-- Use a tool whose maximum spindle speed is defined; set speed and feed to suit your tool and material.
+- Use a tool whose maximum spindle speed is defined; set speed and the feeds to suit your tool and material.
 - The numbers are engraved with the control's single-stroke text engraving.
 - Run the first part on scrap material.
